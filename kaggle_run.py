@@ -21,7 +21,8 @@ NOTE ON GETTING THE CODE THERE: Kaggle can't see your laptop. Either
   (b) Kaggle -> Datasets -> New Dataset -> upload the 3 .py files, then
       CODE_DIR = '/kaggle/input/<your-dataset-name>'
 """
-import os, sys, subprocess, shutil
+import os, sys, subprocess, shutil, functools
+print = functools.partial(print, flush=True)   # Kaggle buffers stdout
 
 # ----------------------------------------------------------------- config
 REPO      = "https://github.com/AHSharan/SIH2026PS175"   # public, clones on Kaggle
@@ -116,9 +117,8 @@ for tag, kw in RUNS:
                              tile=P.RS3DADA_PATCH, overlap=0.25,
                              verbose=(i == 0), **kw)
         np.save(os.path.join(outdir, f"{rec['tile_id']}_pred.npy"), h)
-        if i % 10 == 0:
-            print(f"  {i+1}/{len(recs)} {rec['tile_id']} "
-                  f"[{h.min():.1f},{h.max():.1f}] m  {time.time()-t0:.0f}s")
+        print(f"  {i+1}/{len(recs)} {rec['tile_id']} "
+              f"[{h.min():.1f},{h.max():.1f}] m  {time.time()-t0:.1f}s")
 
     res = E.evaluate(outdir, h_d, buckets, "*", "*_AGL.h5")
     print()
