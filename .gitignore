@@ -1,0 +1,7 @@
+gamus/
+preds_*/
+metrics_*.json
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+gsd_check.png

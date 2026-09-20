@@ -1,0 +1,17 @@
+{
+  "name": "PHL_4983",
+  "width": 1024,
+  "height": 1024,
+  "gsd_m": 0.3,
+  "gsd_asserted": true,
+  "extent_m": [
+    307.2,
+    307.2
+  ],
+  "h_min": 1.1627197409325163e-06,
+  "h_max": 25.930130004882812,
+  "h_p99": 21.548067092895508,
+  "source": "ground_truth",
+  "tile_id": "PHL_4983",
+  "has_reference": false
+}

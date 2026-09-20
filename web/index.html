@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DepthWizard — 3D Terrain Flythrough</title>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#131924e6; --line:#243044; --fg:#e6edf7;
+    --dim:#8b9bb4; --accent:#4da3ff; --good:#3ddc97; --warn:#ffb454;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);
+    color:var(--fg);font:13px/1.45 ui-sans-serif,system-ui,'Segoe UI',Roboto,sans-serif}
+  canvas{display:block}
+  #app{position:fixed;inset:0}
+  .panel{position:absolute;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;backdrop-filter:blur(12px);padding:12px 13px;
+    box-shadow:0 8px 32px #0009}
+  #left{top:14px;left:14px;width:232px}
+  #right{top:14px;right:14px;width:212px}
+  #bottom{bottom:14px;left:50%;transform:translateX(-50%);
+    display:flex;gap:16px;align-items:center;padding:9px 16px}
+  h1{margin:0 0 2px;font-size:15px;letter-spacing:.2px}
+  .sub{color:var(--dim);font-size:11px;margin-bottom:11px}
+  h2{margin:13px 0 7px;font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.9px;color:var(--dim);font-weight:600}
+  label{display:block;margin:7px 0 3px;color:var(--dim);font-size:11px}
+  input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+  select,button{width:100%;background:#1b2434;color:var(--fg);
+    border:1px solid var(--line);border-radius:6px;padding:6px 8px;
+    font:inherit;font-size:12px;cursor:pointer}
+  button:hover,select:hover{border-color:var(--accent)}
+  button.active{background:var(--accent);color:#04121f;border-color:var(--accent);
+    font-weight:600}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+  .kv{display:flex;justify-content:space-between;gap:8px;padding:2.5px 0;
+    font-variant-numeric:tabular-nums}
+  .kv span:first-child{color:var(--dim)}
+  .kv b{font-weight:600}
+  .val{color:var(--accent);font-variant-numeric:tabular-nums}
+  kbd{background:#1b2434;border:1px solid var(--line);border-bottom-width:2px;
+    border-radius:4px;padding:1px 5px;font:11px ui-monospace,monospace}
+  #scalebar{display:flex;flex-direction:column;align-items:center;gap:3px}
+  #sbline{height:5px;border:1px solid var(--fg);border-top:none;width:110px}
+  #compass{width:44px;height:44px;position:relative}
+  #legend{height:9px;border-radius:3px;margin-top:5px;border:1px solid var(--line)}
+  .legend-lab{display:flex;justify-content:space-between;color:var(--dim);
+    font-size:10px;margin-top:2px;font-variant-numeric:tabular-nums}
+  #crosshair{position:absolute;left:50%;top:50%;width:14px;height:14px;
+    margin:-7px 0 0 -7px;pointer-events:none;opacity:0;transition:opacity .2s}
+  #crosshair:before,#crosshair:after{content:'';position:absolute;background:#fff9;}
+  #crosshair:before{left:6px;top:0;width:2px;height:14px}
+  #crosshair:after{top:6px;left:0;height:2px;width:14px}
+  body.fly #crosshair{opacity:1}
+  #toast{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);
+    background:#131924f2;border:1px solid var(--line);border-radius:8px;
+    padding:9px 15px;opacity:0;transition:opacity .3s;pointer-events:none;
+    max-width:440px;text-align:center}
+  #toast.show{opacity:1}
+  .badge{display:inline-block;padding:1.5px 7px;border-radius:99px;font-size:10px;
+    font-weight:600;letter-spacing:.3px}
+  .badge.gt{background:#ffb45422;color:var(--warn);border:1px solid #ffb45455}
+  .badge.pred{background:#3ddc9722;color:var(--good);border:1px solid #3ddc9755}
+  #loading{position:absolute;inset:0;display:grid;place-items:center;
+    background:var(--bg);z-index:50;font-size:13px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="crosshair"></div>
+<div id="loading">building terrain…</div>
+
+<div class="panel" id="left">
+  <h1>DepthWizard</h1>
+  <div class="sub">Single-view height → 3D flythrough</div>
+
+  <h2>Scene</h2>
+  <select id="scene"></select>
+  <div style="margin-top:7px"><span id="srcbadge" class="badge gt">—</span></div>
+
+  <h2>Surface</h2>
+  <div class="row">
+    <button data-mode="tex" class="active">Texture</button>
+    <button data-mode="height">Height</button>
+    <button data-mode="slope">Slope</button>
+    <button data-mode="error" id="btn-error">Error</button>
+  </div>
+  <div id="legend"></div>
+  <div class="legend-lab"><span id="lmin">—</span><span id="lmax">—</span></div>
+
+  <h2>Vertical exaggeration <span class="val" id="vexv">2.0×</span></h2>
+  <input type="range" id="vex" min="0.5" max="8" step="0.1" value="2">
+
+  <h2>Sun azimuth <span class="val" id="sazv">135°</span></h2>
+  <input type="range" id="saz" min="0" max="360" step="1" value="135">
+  <h2>Sun elevation <span class="val" id="selv">42°</span></h2>
+  <input type="range" id="sel" min="5" max="89" step="1" value="42">
+
+  <h2>Navigation</h2>
+  <div class="row">
+    <button id="mode-fly" class="active">Fly</button>
+    <button id="mode-orbit">Orbit</button>
+  </div>
+  <button id="measure" style="margin-top:6px">Measure distance</button>
+</div>
+
+<div class="panel" id="right">
+  <h2>Probe</h2>
+  <div class="kv"><span>Height</span><b id="p-h">—</b></div>
+  <div class="kv"><span>Slope</span><b id="p-s">—</b></div>
+  <div class="kv"><span>X / Y</span><b id="p-xy">—</b></div>
+  <div class="kv" id="p-err-row" style="display:none">
+    <span>Error</span><b id="p-e">—</b></div>
+
+  <h2>Scene stats</h2>
+  <div class="kv"><span>Extent</span><b id="s-ext">—</b></div>
+  <div class="kv"><span>GSD</span><b id="s-gsd">—</b></div>
+  <div class="kv"><span>Max height</span><b id="s-max">—</b></div>
+
+  <div id="valblock" style="display:none">
+    <h2>Validation vs reference</h2>
+    <div class="kv"><span>RMSE</span><b id="v-rmse">—</b></div>
+    <div class="kv"><span>MAE</span><b id="v-mae">—</b></div>
+    <div class="kv"><span>Bias</span><b id="v-bias">—</b></div>
+  </div>
+
+  <h2>Performance</h2>
+  <div class="kv"><span>FPS</span><b id="fps">—</b></div>
+  <div class="kv"><span>Vertices</span><b id="verts">—</b></div>
+  <div class="kv"><span>Eye alt.</span><b id="alt">—</b></div>
+</div>
+
+<div class="panel" id="bottom">
+  <div id="scalebar"><span id="sbtxt" style="font-size:11px">—</span>
+    <div id="sbline"></div></div>
+  <svg id="compass" viewBox="0 0 44 44">
+    <circle cx="22" cy="22" r="20" fill="none" stroke="#243044"/>
+    <g id="needle"><path d="M22 6 L26 24 L22 21 L18 24 Z" fill="#4da3ff"/></g>
+    <text x="22" y="5" fill="#8b9bb4" font-size="8" text-anchor="middle">N</text>
+  </svg>
+  <div style="font-size:11px;color:var(--dim);line-height:1.7">
+    <kbd>click</kbd> look · <kbd>W A S D</kbd> move · <kbd>Q E</kbd> alt ·
+    <kbd>shift</kbd> boost · <kbd>esc</kbd> release
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const $=id=>document.getElementById(id);
+const MESH_N=1024;              // mesh grid resolution (verts per side)
+
+/* ---------------------------------------------------------------- scene */
+const app=$('app');
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',
+  preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.35;
+app.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x121a27);
+scene.fog=new THREE.Fog(0x121a27,900,3400);
+
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,0.5,8000);
+
+const sun=new THREE.DirectionalLight(0xfff0d8,3.4);
+sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+const sc=sun.shadow.camera;
+sc.near=1;sc.far=2200;sc.left=sc.bottom=-320;sc.right=sc.top=320;
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xbcd8ff,0x2a3444,1.15));
+scene.add(new THREE.AmbientLight(0xffffff,0.30));
+
+const orbit=new OrbitControls(camera,renderer.domElement);
+orbit.enableDamping=true;orbit.dampingFactor=0.08;orbit.enabled=false;
+
+/* ------------------------------------------------------------ app state */
+let S=null;          // {meta,heights,ref,W,H,gsd,extentX,extentY}
+let mesh=null, vex=2.0, mode='tex', texMap=null;
+let measuring=false, measurePts=[], measureLine=null;
+
+const toast=(m,ms=2600)=>{const t=$('toast');t.textContent=m;t.classList.add('show');
+  clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),ms);};
+
+/* ------------------------------------------------------------ colormaps */
+// explicit multi-stop ramp: predictable, and reads correctly in print
+const RAMP=[[0,[38,48,92]],[0.18,[32,120,190]],[0.38,[40,186,160]],
+            [0.58,[150,215,80]],[0.78,[248,214,60]],[1,[214,64,42]]];
+function turbo(t){
+  t=Math.max(0,Math.min(1,t));
+  for(let i=1;i<RAMP.length;i++){
+    if(t<=RAMP[i][0]){
+      const [t0,c0]=RAMP[i-1],[t1,c1]=RAMP[i];
+      const k=(t-t0)/Math.max(1e-6,t1-t0);
+      return [0,1,2].map(j=>Math.round(c0[j]+(c1[j]-c0[j])*k));
+    }
+  }
+  return RAMP[RAMP.length-1][1];
+}
+function diverging(t){ // -1..1 -> blue..white..red
+  const a=Math.max(-1,Math.min(1,t));
+  if(a<0){const k=1+a;return [Math.round(60+195*k),Math.round(90+165*k),255];}
+  const k=1-a;return [255,Math.round(90+165*k),Math.round(60+195*k)];
+}
+
+/* ------------------------------------------------------------- geometry */
+function buildMesh(){
+  if(mesh){scene.remove(mesh);mesh.geometry.dispose();
+    if(Array.isArray(mesh.material))mesh.material.forEach(m=>m.dispose());
+    else mesh.material.dispose();}
+
+  const {W,H,gsd}=S, EX=W*gsd, EY=H*gsd;
+  const N=Math.min(MESH_N,Math.min(W,H));
+  const geo=new THREE.PlaneGeometry(EX,EY,N-1,N-1);
+  geo.rotateX(-Math.PI/2);                 // XZ ground plane, +Y up
+
+  const pos=geo.attributes.position;
+  for(let j=0;j<N;j++){
+    const sy=Math.min(H-1,Math.round(j*(H-1)/(N-1)));
+    for(let i=0;i<N;i++){
+      const sx=Math.min(W-1,Math.round(i*(W-1)/(N-1)));
+      pos.setY(j*N+i, S.heights[sy*W+sx]*vex);
+    }
+  }
+  pos.needsUpdate=true;
+  geo.computeVertexNormals();
+
+  const mat=new THREE.MeshStandardMaterial({
+    map: mode==='tex'?texMap:null,
+    vertexColors: mode!=='tex',
+    roughness:0.93, metalness:0.0, flatShading:false
+  });
+  if(mode!=='tex') applyColors(geo,N);
+
+  mesh=new THREE.Mesh(geo,mat);
+  mesh.castShadow=mesh.receiveShadow=true;
+  scene.add(mesh);
+  $('verts').textContent=(N*N/1000).toFixed(0)+'k';
+}
+
+function applyColors(geo,N){
+  const {W,H}=S, n=N*N, col=new Float32Array(n*3);
+  const hmax=Math.max(1,S.meta.h_p99||S.meta.h_max);
+  let lo=0,hi=hmax;
+  if(mode==='error'){lo=-10;hi=10;}
+  if(mode==='slope'){lo=0;hi=60;}
+  for(let j=0;j<N;j++){
+    const sy=Math.min(H-1,Math.round(j*(H-1)/(N-1)));
+    for(let i=0;i<N;i++){
+      const sx=Math.min(W-1,Math.round(i*(W-1)/(N-1)));
+      const k=sy*W+sx; let rgb;
+      if(mode==='height') rgb=turbo(S.heights[k]/hmax);
+      else if(mode==='slope') rgb=turbo(slopeAt(sx,sy)/60);
+      else { const e=S.ref?(S.heights[k]-S.ref[k]):0; rgb=diverging(e/10); }
+      const o=(j*N+i)*3;
+      col[o]=rgb[0]/255;col[o+1]=rgb[1]/255;col[o+2]=rgb[2]/255;
+    }
+  }
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  $('lmin').textContent=mode==='error'?'-10 m':(mode==='slope'?'0°':'0 m');
+  $('lmax').textContent=mode==='error'?'+10 m':(mode==='slope'?'60°':hmax.toFixed(0)+' m');
+  const stops=[];
+  for(let s=0;s<=10;s++){const t=s/10;
+    const c=mode==='error'?diverging(t*2-1):turbo(t);
+    stops.push(`rgb(${c[0]},${c[1]},${c[2]}) ${t*100}%`);}
+  $('legend').style.background=`linear-gradient(90deg,${stops.join(',')})`;
+}
+
+function heightAt(px,py){
+  const {W,H}=S;
+  const x=Math.max(0,Math.min(W-1,Math.round(px)));
+  const y=Math.max(0,Math.min(H-1,Math.round(py)));
+  return S.heights[y*W+x];
+}
+function slopeAt(px,py){
+  const {W,H,gsd}=S;
+  const x=Math.max(1,Math.min(W-2,Math.round(px))),
+        y=Math.max(1,Math.min(H-2,Math.round(py)));
+  const dzdx=(S.heights[y*W+x+1]-S.heights[y*W+x-1])/(2*gsd);
+  const dzdy=(S.heights[(y+1)*W+x]-S.heights[(y-1)*W+x])/(2*gsd);
+  return Math.atan(Math.hypot(dzdx,dzdy))*180/Math.PI;
+}
+// world (x,z) -> pixel (px,py)
+function worldToPx(x,z){
+  const EX=S.W*S.gsd, EY=S.H*S.gsd;
+  return [ (x+EX/2)/S.gsd, (z+EY/2)/S.gsd ];
+}
+
+/* ----------------------------------------------------------- scene load */
+async function loadScene(name){
+  $('loading').style.display='grid';
+  const meta=await (await fetch(`assets/${name}_meta.json`)).json();
+  const hbuf=await (await fetch(`assets/${name}_h.bin`)).arrayBuffer();
+  const heights=new Float32Array(hbuf);
+  let ref=null;
+  if(meta.has_reference){
+    try{ref=new Float32Array(await (await fetch(`assets/${name}_ref.bin`)).arrayBuffer());}
+    catch(e){ref=null;}
+  }
+  texMap=await new THREE.TextureLoader().loadAsync(`assets/${name}_tex.jpg`);
+  texMap.colorSpace=THREE.SRGBColorSpace;
+  texMap.anisotropy=renderer.capabilities.getMaxAnisotropy();
+
+  S={meta,heights,ref,W:meta.width,H:meta.height,gsd:meta.gsd_m};
+
+  const isPred=meta.source==='prediction';
+  const b=$('srcbadge');
+  b.className='badge '+(isPred?'pred':'gt');
+  b.textContent=isPred?'MODEL PREDICTION':'GROUND TRUTH (no model yet)';
+
+  $('s-ext').textContent=`${meta.extent_m[0].toFixed(0)}×${meta.extent_m[1].toFixed(0)} m`;
+  $('s-gsd').textContent=meta.gsd_m+' m'+(meta.gsd_asserted?'*':'');
+  $('s-max').textContent=meta.h_max.toFixed(1)+' m';
+
+  $('btn-error').disabled=!ref;
+  $('btn-error').style.opacity=ref?1:0.4;
+  $('p-err-row').style.display=ref?'flex':'none';
+  if(meta.metrics){
+    $('valblock').style.display='block';
+    $('v-rmse').textContent=meta.metrics.rmse_m.toFixed(2)+' m';
+    $('v-mae').textContent=meta.metrics.mae_m.toFixed(2)+' m';
+    $('v-bias').textContent=(meta.metrics.bias_m>=0?'+':'')+meta.metrics.bias_m.toFixed(2)+' m';
+  } else $('valblock').style.display='none';
+
+  buildMesh();
+  frameScene();
+  $('loading').style.display='none';
+}
+
+function frameScene(){
+  const EX=S.W*S.gsd;
+  camera.position.set(-EX*0.60,EX*0.46,EX*0.80);
+  lookAtPoint(new THREE.Vector3(0,S.meta.h_p99*vex*0.4,0));
+  orbit.target.set(0,0,0);orbit.update();
+}
+// point the camera AND keep fly-mode yaw/pitch consistent
+function lookAtPoint(t){
+  const d=t.clone().sub(camera.position).normalize();
+  yaw=Math.atan2(d.x,d.z);
+  pitch=Math.asin(Math.max(-1,Math.min(1,d.y)));
+  camera.lookAt(t);
+}
+
+/* ------------------------------------------------------------- sun/UI */
+function updateSun(){
+  const az=+$('saz').value*Math.PI/180, el=+$('sel').value*Math.PI/180;
+  const R=700;
+  sun.position.set(R*Math.cos(el)*Math.sin(az),R*Math.sin(el),R*Math.cos(el)*Math.cos(az));
+  sun.target.position.set(0,0,0);scene.add(sun.target);
+  $('sazv').textContent=$('saz').value+'°';$('selv').textContent=$('sel').value+'°';
+}
+$('saz').oninput=$('sel').oninput=updateSun;
+$('vex').oninput=e=>{vex=+e.target.value;$('vexv').textContent=vex.toFixed(1)+'×';buildMesh();};
+
+document.querySelectorAll('[data-mode]').forEach(btn=>{
+  btn.onclick=()=>{
+    if(btn.disabled)return;
+    mode=btn.dataset.mode;
+    document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b===btn));
+    $('legend').style.display=mode==='tex'?'none':'block';
+    buildMesh();
+  };
+});
+
+/* --------------------------------------------------- navigation: fly */
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=true;});
+addEventListener('keyup',e=>{keys[e.code]=false;});
+let yaw=2.4,pitch=-0.42,flyMode=true;
+
+let dragLook=false, dragPrev=null, pointerLockOK=true;
+renderer.domElement.addEventListener('click',e=>{
+  if(measuring){doMeasure(e);return;}
+  if(dragLook){dragLook=false;return;}          // ignore click that ended a drag
+  if(flyMode && pointerLockOK && document.pointerLockElement!==renderer.domElement){
+    // pointer lock is unavailable in sandboxed iframes; fall back to drag-look
+    const r=renderer.domElement.requestPointerLock();
+    if(r&&r.catch)r.catch(()=>{pointerLockOK=false;
+      toast('Pointer lock blocked here - drag with the mouse to look around');});
+  } else if(!flyMode) probe(e);
+});
+// drag-to-look fallback (also nicer on trackpads)
+renderer.domElement.addEventListener('mousedown',e=>{
+  if(flyMode && document.pointerLockElement!==renderer.domElement){
+    dragPrev={x:e.clientX,y:e.clientY};}
+});
+addEventListener('mouseup',()=>{dragPrev=null;});
+addEventListener('mousemove',e=>{
+  if(dragPrev){
+    const dx=e.clientX-dragPrev.x, dy=e.clientY-dragPrev.y;
+    if(Math.abs(dx)+Math.abs(dy)>2)dragLook=true;
+    yaw-=dx*0.004; pitch=Math.max(-1.5,Math.min(1.5,pitch-dy*0.004));
+    dragPrev={x:e.clientX,y:e.clientY};
+  }
+});
+document.addEventListener('pointerlockchange',()=>{
+  document.body.classList.toggle('fly',document.pointerLockElement===renderer.domElement);
+});
+addEventListener('mousemove',e=>{
+  if(document.pointerLockElement===renderer.domElement){
+    yaw-=e.movementX*0.0022; pitch-=e.movementY*0.0022;
+    pitch=Math.max(-1.5,Math.min(1.5,pitch));
+  }
+});
+$('mode-fly').onclick=()=>{flyMode=true;orbit.enabled=false;
+  $('mode-fly').classList.add('active');$('mode-orbit').classList.remove('active');
+  toast('Fly mode — click to capture mouse, WASD to move');};
+$('mode-orbit').onclick=()=>{flyMode=false;orbit.enabled=true;
+  document.exitPointerLock?.();
+  $('mode-orbit').classList.add('active');$('mode-fly').classList.remove('active');
+  toast('Orbit mode — drag to rotate, click terrain to probe height');};
+
+function flyStep(dt){
+  if(!flyMode)return;
+  const fwd=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),
+                              Math.cos(yaw)*Math.cos(pitch));
+  // Matrix4.lookAt(eye,target,up) puts +Z along (eye-target); the camera views
+  // down -Z, so target must be +fwd, NOT -fwd, or the view is mirrored 180deg.
+  camera.quaternion.setFromRotationMatrix(
+    new THREE.Matrix4().lookAt(new THREE.Vector3(0,0,0),fwd,
+                               new THREE.Vector3(0,1,0)));
+  const right=new THREE.Vector3().crossVectors(fwd,new THREE.Vector3(0,1,0)).normalize();
+  let sp=(keys['ShiftLeft']||keys['ShiftRight'])?260:85;
+  const v=new THREE.Vector3();
+  if(keys['KeyW'])v.add(fwd); if(keys['KeyS'])v.sub(fwd);
+  if(keys['KeyD'])v.add(right); if(keys['KeyA'])v.sub(right);
+  if(keys['KeyE'])v.y+=1; if(keys['KeyQ'])v.y-=1;
+  if(v.lengthSq()>0)camera.position.addScaledVector(v.normalize(),sp*dt);
+
+  // terrain collision: never drop below the surface + 2 m eye height
+  const [px,py]=worldToPx(camera.position.x,camera.position.z);
+  if(px>=0&&py>=0&&px<S.W&&py<S.H){
+    const floor=heightAt(px,py)*vex+2;
+    if(camera.position.y<floor)camera.position.y=floor;
+  }
+}
+
+/* ----------------------------------------------------- probe & measure */
+const ray=new THREE.Raycaster(), ndc=new THREE.Vector2();
+function pick(e){
+  ndc.x=(e.clientX/innerWidth)*2-1; ndc.y=-(e.clientY/innerHeight)*2+1;
+  ray.setFromCamera(ndc,camera);
+  const hit=ray.intersectObject(mesh,false);
+  return hit.length?hit[0].point:null;
+}
+function probe(e){
+  const p=pick(e); if(!p)return;
+  const [px,py]=worldToPx(p.x,p.z);
+  const h=heightAt(px,py);
+  $('p-h').textContent=h.toFixed(2)+' m';
+  $('p-s').textContent=slopeAt(px,py).toFixed(1)+'°';
+  $('p-xy').textContent=`${px.toFixed(0)}, ${py.toFixed(0)} px`;
+  if(S.ref){
+    const e2=h-S.ref[Math.round(py)*S.W+Math.round(px)];
+    $('p-e').textContent=(e2>=0?'+':'')+e2.toFixed(2)+' m';
+  }
+}
+$('measure').onclick=()=>{
+  measuring=!measuring; measurePts=[];
+  $('measure').classList.toggle('active',measuring);
+  $('measure').textContent=measuring?'Measuring — click 2 points':'Measure distance';
+  if(!measuring&&measureLine){scene.remove(measureLine);measureLine=null;}
+  if(measuring&&flyMode)$('mode-orbit').onclick();
+};
+function doMeasure(e){
+  const p=pick(e); if(!p)return;
+  measurePts.push(p);
+  if(measurePts.length===2){
+    const [a,b]=measurePts;
+    const d=Math.hypot(a.x-b.x,a.z-b.z);
+    const [ax,ay]=worldToPx(a.x,a.z),[bx,by]=worldToPx(b.x,b.z);
+    const dh=heightAt(bx,by)-heightAt(ax,ay);
+    if(measureLine)scene.remove(measureLine);
+    measureLine=new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(measurePts),
+      new THREE.LineBasicMaterial({color:0x4da3ff}));
+    scene.add(measureLine);
+    toast(`Distance ${d.toFixed(1)} m   ·   Δheight ${dh>=0?'+':''}${dh.toFixed(2)} m`,5200);
+    measurePts=[];
+  }
+}
+
+window.DW={setMode:m=>{const b=document.querySelector(`[data-mode="${m}"]`);
+  if(b&&!b.disabled)b.click();},
+  frame:()=>frameScene(), get state(){return S;},
+  setVex:v=>{vex=v;$('vex').value=v;$('vexv').textContent=v.toFixed(1)+'x';buildMesh();},
+  setSun:(az,el)=>{$('saz').value=az;$('sel').value=el;updateSun();},
+  orbitTo:(azDeg,elDeg,dist)=>{const a=azDeg*Math.PI/180,e=elDeg*Math.PI/180;
+    camera.position.set(dist*Math.cos(e)*Math.sin(a),dist*Math.sin(e),
+                        dist*Math.cos(e)*Math.cos(a));
+    lookAtPoint(new THREE.Vector3(0,S.meta.h_p99*vex*0.35,0));},
+  probeAt:(px,py)=>{const h=heightAt(px,py);
+    $('p-h').textContent=h.toFixed(2)+' m';
+    $('p-s').textContent=slopeAt(px,py).toFixed(1)+'°';
+    $('p-xy').textContent=`${px.toFixed(0)}, ${py.toFixed(0)} px`;
+    return h;},
+  // render and read back in the SAME tick, else the buffer is already cleared.
+  // Capture at the canvas's native backing size (devicePixelRatio already
+  // gives us 2400x1350); resizing the renderer mid-capture mis-framed the view.
+  capture:()=>{renderer.render(scene,camera);
+    return renderer.domElement.toDataURL('image/jpeg',0.92);}};
+
+/* ------------------------------------------------------------- render */
+let last=performance.now(),fpsAcc=0,fpsN=0;
+function tick(){
+  requestAnimationFrame(tick);
+  const now=performance.now(), dt=Math.min(0.05,(now-last)/1000); last=now;
+  fpsAcc+=1/Math.max(dt,1e-4); fpsN++;
+  if(fpsN>=20){$('fps').textContent=(fpsAcc/fpsN).toFixed(0);fpsAcc=fpsN=0;}
+  if(S){
+    flyStep(dt);
+    if(orbit.enabled)orbit.update();
+    $('alt').textContent=camera.position.y.toFixed(0)+' m';
+    const m=Math.round(110*(2*camera.position.y*Math.tan(camera.fov*Math.PI/360))/innerHeight);
+    $('sbtxt').textContent=m>0?`${m} m`:'—';
+    $('needle').setAttribute('transform',`rotate(${-yaw*180/Math.PI} 22 22)`);
+    renderer.render(scene,camera);
+  }
+}
+function fit(){
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+}
+addEventListener('resize',fit);
+new ResizeObserver(fit).observe(document.body);
+
+/* --------------------------------------------------------------- boot */
+(async()=>{
+  const scenes=await (await fetch('assets/scenes.json')).json();
+  const sel=$('scene');
+  scenes.forEach(n=>{const o=document.createElement('option');o.value=o.textContent=n;sel.appendChild(o);});
+  sel.onchange=()=>loadScene(sel.value);
+  updateSun();
+  $('legend').style.display='none';
+  await loadScene(scenes[0]);
+  tick();
+  toast('Click the view to capture the mouse, then fly with W A S D',4200);
+})();
+</script>
+</body>
+</html>

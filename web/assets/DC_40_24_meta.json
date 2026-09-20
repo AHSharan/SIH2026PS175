@@ -1,0 +1,17 @@
+{
+  "name": "DC_40_24",
+  "width": 1024,
+  "height": 1024,
+  "gsd_m": 0.3,
+  "gsd_asserted": true,
+  "extent_m": [
+    307.2,
+    307.2
+  ],
+  "h_min": 0.0,
+  "h_max": 49.68899917602539,
+  "h_p99": 47.45000076293945,
+  "source": "ground_truth",
+  "tile_id": "DC_40_24",
+  "has_reference": false
+}
