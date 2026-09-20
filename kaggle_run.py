@@ -24,7 +24,7 @@ NOTE ON GETTING THE CODE THERE: Kaggle can't see your laptop. Either
 import os, sys, subprocess, shutil
 
 # ----------------------------------------------------------------- config
-REPO      = ""            # e.g. "https://github.com/<you>/depthwizard"
+REPO      = "https://github.com/AHSharan/SIH2026PS175"   # public, clones on Kaggle
 CODE_DIR  = ""            # e.g. "/kaggle/input/depthwizard-code"
 N_TILES   = 40            # per-run tile count; 40 is enough for a stable RMSE
 SPLIT     = "test"
