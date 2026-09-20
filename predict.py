@@ -229,6 +229,26 @@ class RS3DAda:
         self.model.eval().to(self.device)
         print(f"[RS3DAda] loaded on {self.device}")
 
+    def _forward(self, chw: np.ndarray):
+        """Returns the raw output dict. chw is raw 0-255 float RGB."""
+        torch = self.torch
+        x = (np.transpose(chw, (1, 2, 0)) - RS3DADA_MEAN) / RS3DADA_STD
+        x = np.transpose(x, (2, 0, 1))[None]
+        t = torch.from_numpy(np.ascontiguousarray(x, np.float32)).to(self.device)
+        with torch.no_grad():
+            if self.amp:
+                with torch.autocast("cuda", dtype=torch.float16):
+                    return self.model(t)
+            return self.model(t)
+
+    def predict_seg(self, chw: np.ndarray) -> np.ndarray:
+        """Predicted segmentation class ids (H,W) int16, from the model's own
+        8-class head. Used for class-wise correction, so we never need GT
+        labels at test time."""
+        out = self._forward(chw)
+        seg = out["segmentation"] if isinstance(out, dict) else out
+        return seg[0].float().argmax(0).cpu().numpy().astype(np.int16)
+
     def predict_fn(self, chw: np.ndarray) -> np.ndarray:
         """chw is raw 0-255 float RGB. Normalisation happens HERE."""
         torch = self.torch
