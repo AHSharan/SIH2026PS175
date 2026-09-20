@@ -191,7 +191,7 @@ orbit.enableDamping=true;orbit.dampingFactor=0.08;orbit.enabled=false;
 
 /* ------------------------------------------------------------ app state */
 let S=null;          // {meta,heights,ref,W,H,gsd,extentX,extentY}
-let mesh=null, vex=2.0, mode='tex', texMap=null;
+let mesh=null, ground=null, vex=2.0, mode='tex', texMap=null;
 let measuring=false, measurePts=[], measureLine=null;
 
 const toast=(m,ms=2600)=>{const t=$('toast');t.textContent=m;t.classList.add('show');
@@ -245,12 +245,65 @@ function buildMesh(){
     vertexColors: mode!=='tex',
     roughness:0.93, metalness:0.0, flatShading:false
   });
-  if(mode!=='tex') applyColors(geo,N);
+  if(mode!=='tex'){ applyColors(geo,N); }
+  else { applyWallness(geo); wallShader(mat); }
 
   mesh=new THREE.Mesh(geo,mat);
   mesh.castShadow=mesh.receiveShadow=true;
   scene.add(mesh);
+
+  // base slab: grounds the tile visually and catches the cast shadows
+  if(ground){scene.remove(ground);ground.geometry.dispose();ground.material.dispose();}
+  const g=new THREE.PlaneGeometry(EX*2.6,EY*2.6);
+  g.rotateX(-Math.PI/2);
+  ground=new THREE.Mesh(g,new THREE.MeshStandardMaterial({
+    color:0x1b2432,roughness:1,metalness:0}));
+  ground.position.y=-0.35; ground.receiveShadow=true;
+  scene.add(ground);
   $('verts').textContent=(N*N/1000).toFixed(0)+'k';
+}
+
+// A heightmap is one continuous surface, so a building edge becomes a single
+// vertically-stretched triangle and the top-down texture smears down the wall.
+// We tag each vertex with 'wallness' (1 = vertical face) and, in the shader,
+// MIX the sampled texture toward a flat facade colour. Mixing (not
+// multiplying) is what actually removes the streaks.
+function applyWallness(geo){
+  const nrm=geo.attributes.normal, n=nrm.count;
+  const w=new Float32Array(n);
+  for(let i=0;i<n;i++){
+    const ny=Math.abs(nrm.getY(i));
+    // smoothstep(0.75 -> 0.35): ~0 on roofs/roads (ny high), 1 only on
+    // genuinely vertical faces. pow() was far too broad and washed out
+    // roof and road detail, making the whole tile look like a foam model.
+    const t=Math.min(1,Math.max(0,(0.75-ny)/(0.75-0.35)));
+    w[i]=t*t*(3-2*t);
+  }
+  geo.setAttribute('wallness',new THREE.BufferAttribute(w,1));
+}
+function wallShader(mat){
+  mat.onBeforeCompile=sh=>{
+    sh.vertexShader=`attribute float wallness;
+varying float vWall;
+varying float vWorldY;
+` + sh.vertexShader.replace('#include <begin_vertex>',
+        `#include <begin_vertex>
+  vWall = wallness;
+  vWorldY = (modelMatrix * vec4(position,1.0)).y;`);
+    sh.fragmentShader=`varying float vWall;
+varying float vWorldY;
+uniform float uHMax;
+` + sh.fragmentShader.replace('#include <map_fragment>',
+        `#include <map_fragment>
+  // facades: darker near the ground, lighter toward the roofline, so a wall
+  // reads as a wall instead of a flat blown-out slab
+  float hfrac = clamp(vWorldY / max(uHMax, 1.0), 0.0, 1.0);
+  vec3 facade = mix(vec3(0.17,0.18,0.21), vec3(0.42,0.43,0.47), hfrac);
+  diffuseColor.rgb = mix(diffuseColor.rgb, facade, clamp(vWall,0.0,1.0));`);
+    sh.uniforms.uHMax={value:(S?S.meta.h_p99*vex:40.0)};
+    mat.userData.sh=sh;
+  };
+  mat.customProgramCacheKey=()=>'wall';
 }
 
 function applyColors(geo,N){
