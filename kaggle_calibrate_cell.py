@@ -147,16 +147,25 @@ for i, rec in enumerate(trecs):
         print(f"  test {i+1}/{len(trecs)}  {time.time()-t0:.0f}s", flush=True)
 
 # ------------------------------------------------- 3. compare
+# Zero baseline on the SAME tiles, so "how much does the model actually add
+# over predicting nothing?" is answered exactly rather than approximately.
+ZERO = os.path.join(WORK, "preds_zero")
+os.makedirs(ZERO, exist_ok=True)
+for p_ in glob.glob(os.path.join(PRED_C, "*.npy")):
+    np.save(os.path.join(ZERO, os.path.basename(p_)),
+            np.zeros_like(np.load(p_), np.float32))
+
 buckets = E.auto_buckets_from_cls(TEST_CLS)
 rows = []
-for tag, d in (("C  GSD + tiling/TTA (before)", PRED_C),
+for tag, d in (("B0 predict zero (floor)", ZERO),
+               ("C  GSD + tiling/TTA (before)", PRED_C),
                ("D  + global offset", OUT_GLOBAL),
                ("E  + class-wise offset", OUT_CLASS)):
     r = E.evaluate(d, TEST_GT, buckets, "*", "*_AGL.h5")
     rows.append((tag, r))
     print("\n" + E.markdown_table(r["summary"], tag))
 
-for tag, r in rows[1:]:
+for tag, r in rows[2:]:
     E.append_progression(os.path.join(WORK, "progression.md"), tag,
                          r["summary"],
                          notes=f"offsets fitted on {len(vrecs)} VAL tiles, "
