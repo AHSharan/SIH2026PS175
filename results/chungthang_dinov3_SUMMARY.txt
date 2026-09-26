@@ -1,0 +1,20 @@
+DepthWizard DSM run - 2026-09-26 23:03
+Image      : samples/chungthang_wv2.tif
+Credit     : Maxar Open Data Program, WorldView-2 2022-03-07 (catalog 10300100CE8D0400), CC BY-NC 4.0
+Size       : 2048 x 2048 px at 0.3052 m/px (625 x 625 m)
+Model      : DINOv3-SAT head (ours, trained on GAMUS)
+Output     : DSM  (dsm.tif, ndsm.tif, dem.tif)
+
+Heights above ground predicted by the model (nDSM):
+  half of the area is below 1.99 m, 95 % below 8.87 m, highest points ~15.41 m
+  share of area taller than 2 m : 0.4991
+  looks plausible (99.9 % below 80 m): yes
+
+Terrain and final DSM (metres above sea level, EGM2008):
+  terrain (DEM) : [1549.4, 1769.7]  relief 220.3 m, median slope 22.9 deg
+  final DSM     : [1549.5, 1776.1]
+  DEM double-count estimate: ~2.95 m on average (7.12 m in the busiest 5 %)
+  terrain source: Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA
+
+No LiDAR/survey truth exists for this scene, so there is no RMSE. These are plausibility checks only.
+Run time: 14.4 s
