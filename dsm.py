@@ -434,7 +434,54 @@ def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
           f"{s['ndsm_percentiles_m'].get('95')}/{s['ndsm_percentiles_m'].get('99.9')} m"
           + (f" | DEM {s['dem_min_max_m']} m | 30 m double-count ~{s.get('double_count_30m_mean_m')} m"
              if kind == "dsm" and "dem_min_max_m" in s else ""))
+    write_summary(out, report)
     return report
+
+
+def write_summary(out, r):
+    """SUMMARY.txt: the key numbers in plain words, for people who won't open JSON."""
+    s = r["sanity"]
+    pc = s.get("ndsm_percentiles_m", {})
+    L = [f"DepthWizard DSM run - {time.strftime('%Y-%m-%d %H:%M')}",
+         f"Image      : {r['image']}",
+         f"Credit     : {r.get('image_credit') or '-'}",
+         f"Size       : {r['size_px'][0]} x {r['size_px'][1]} px at {r['gsd_m']} m/px "
+         f"({r['size_px'][0]*r['gsd_m']:.0f} x {r['size_px'][1]*r['gsd_m']:.0f} m)",
+         f"Model      : {r['model']}",
+         f"Output     : {r['kind'].upper()}  ({', '.join(r['files'])})",
+         "",
+         "Heights above ground predicted by the model (nDSM):",
+         f"  half of the area is below {pc.get('50')} m, 95 % below {pc.get('95')} m, "
+         f"highest points ~{pc.get('99.9')} m",
+         f"  share of area taller than 2 m : {s.get('ndsm_frac_above_2m')}",
+         f"  looks plausible (99.9 % below 80 m): {'yes' if s.get('ndsm_plausible') else 'NO - check'}"]
+    if r["kind"] == "dsm":
+        L += ["",
+              "Terrain and final DSM (metres above sea level, EGM2008):",
+              f"  terrain (DEM) : {s.get('dem_min_max_m')}  relief {s.get('dem_relief_m')} m, "
+              f"median slope {s.get('dem_slope_deg_median')} deg",
+              f"  final DSM     : {s.get('dsm_min_max_m')}",
+              f"  DEM double-count estimate: ~{s.get('double_count_30m_mean_m')} m on average "
+              f"({s.get('double_count_30m_p95_m')} m in the busiest 5 %)",
+              f"  terrain source: {r.get('dem_credit')}"]
+    L += ["", s["note"], f"Run time: {r['seconds']} s"]
+    with open(os.path.join(out, "SUMMARY.txt"), "w", encoding="utf-8") as f:
+        f.write("\n".join(L) + "\n")
+
+
+def zip_results(zip_path, out, export, name):
+    """One file to share: the GeoTIFFs, report, summary and this scene's
+    viewer files."""
+    import zipfile
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for fn in sorted(os.listdir(out)):
+            z.write(os.path.join(out, fn), os.path.join("results", fn))
+        if export and os.path.isdir(export):
+            for fn in sorted(os.listdir(export)):
+                if fn.startswith(name + "_"):
+                    z.write(os.path.join(export, fn), os.path.join("viewer", fn))
+    mb = os.path.getsize(zip_path) / 1e6
+    print(f"[saved] everything in ONE file: {os.path.abspath(zip_path)}  ({mb:.1f} MB)")
 
 
 def _identity(gsd):
@@ -517,6 +564,8 @@ def main():
                     help="viewer asset folder ('' to skip)")
     ap.add_argument("--name", default=None)
     ap.add_argument("--credit", default=None, help="image credit written into outputs")
+    ap.add_argument("--no-zip", action="store_true",
+                    help="don't pack the results into <out>_results.zip")
     ap.add_argument("--fetch-sample", action="store_true",
                     help="(maintainers) re-cut samples/ from Maxar + GLO-30")
     a = ap.parse_args()
@@ -530,10 +579,14 @@ def main():
     window = tuple(int(v) for v in a.window.split(",")) if a.window else None
     out = a.out or os.path.join("out_dsm", name or
                                 os.path.splitext(os.path.basename(image))[0])
-    run(image, out, backend=a.backend, window=window, gsd=a.gsd,
-        model_gsd=a.model_gsd, tta=not a.no_tta, tile=a.tile, dem=dem,
-        export=a.export or None, name=name, ckpt=a.ckpt,
-        synrs3d_dir=a.synrs3d_dir, source_note=credit)
+    rep = run(image, out, backend=a.backend, window=window, gsd=a.gsd,
+              model_gsd=a.model_gsd, tta=not a.no_tta, tile=a.tile, dem=dem,
+              export=a.export or None, name=name, ckpt=a.ckpt,
+              synrs3d_dir=a.synrs3d_dir, source_note=credit)
+    print(f"[saved] plain-English numbers: {os.path.abspath(os.path.join(out, 'SUMMARY.txt'))}")
+    if not a.no_zip:
+        zip_results(out.rstrip("/\\") + "_results.zip", out, a.export,
+                    rep.get("viewer", {}).get("name") or name or "")
 
 
 if __name__ == "__main__":

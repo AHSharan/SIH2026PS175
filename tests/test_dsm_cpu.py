@@ -120,6 +120,16 @@ def main():
         check("viewer scenes.json lists scene",
               json.load(open(os.path.join(exp, "scenes.json")))[0] == "syn")
 
+        summ = open(os.path.join(out, "SUMMARY.txt"), encoding="utf-8").read()
+        check("SUMMARY.txt has the numbers", "7.5 m" in summ and "no RMSE" in summ)
+        zp = os.path.join(tmp, "res.zip")
+        M.zip_results(zp, out, exp, "syn")
+        import zipfile
+        names = zipfile.ZipFile(zp).namelist()
+        check("results zip holds tifs, summary, viewer",
+              {"results/dsm.tif", "results/SUMMARY.txt", "results/report.json",
+               "viewer/syn_h.bin", "viewer/syn_meta.json"} <= set(names), f"{len(names)} files")
+
         # ---- 3. window read keeps the georeference right
         out2 = os.path.join(tmp, "out2")
         M.run(img, out2, fn=const_backend(1.0), dem=[dem_p], window=(100, 120, 64, 50),
