@@ -27,8 +27,8 @@ git pull
 python dsm.py
 ```
 
-After the first download it should only take a few minutes (it hasn't been
-timed on a GPU yet). The last lines look like this:
+After the first download it's quick: 18 s end to end on an RTX 5060 laptop GPU
+(measured). The last lines look like this:
 
 ```
 [done] DSM -> out_dsm/chungthang  (… s)

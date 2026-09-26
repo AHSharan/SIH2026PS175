@@ -29,7 +29,7 @@ Final product: `DSM = DEM(terrain) + nDSM(objects)`.
 | `train_head.py` — frozen DINOv3-SAT + trained DPT head | done, 19/19 CPU tests (`tests/`) — **trained on Colab, results in [`RESULTS.md`](RESULTS.md)** |
 | `colab_train.py` — cache -> train -> eval, resumable | done, full dry run + disconnect/resume verified |
 | `web/` — Three.js flythrough | working; prediction mode (error overlay, live RMSE) verified |
-| `dsm.py` — GeoTIFF in -> DSM GeoTIFF out (DEM + nDSM), Indian sample in `samples/` | done, 29/29 CPU tests (`tests/test_dsm_cpu.py`) — **real-model run pending on a GPU** |
+| `dsm.py` — GeoTIFF in -> DSM GeoTIFF out (DEM + nDSM), Indian sample in `samples/` | done, 29/29 CPU tests; **real RS3DAda run on Chungthang: 18 s on an RTX 5060 laptop** |
 
 **Measured** (40 held-out GAMUS test tiles, LiDAR truth; full tables in [`RESULTS.md`](RESULTS.md)):
 
