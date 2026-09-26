@@ -26,13 +26,20 @@ Final product: `DSM = DEM(terrain) + nDSM(objects)`.
 | `eval.py` — metrics harness | done, self-tested (0.13 m noise floor) |
 | `predict.py` — tiled inference, GSD normalisation, TTA | done, 5/5 CPU tests, **ran on Kaggle T4** |
 | `calibrate.py` — ground shift + robust affine | done, 5/5 tests on real tiles |
-| `train_head.py` — frozen DINOv3-SAT + trained DPT head | done, 19/19 CPU tests (`tests/`) — **real run pending on Colab** |
+| `train_head.py` — frozen DINOv3-SAT + trained DPT head | done, 19/19 CPU tests (`tests/`) — **trained on Colab, results in [`RESULTS.md`](RESULTS.md)** |
 | `colab_train.py` — cache -> train -> eval, resumable | done, full dry run + disconnect/resume verified |
 | `web/` — Three.js flythrough | working; prediction mode (error overlay, live RMSE) verified |
 | `dsm.py` — GeoTIFF in -> DSM GeoTIFF out (DEM + nDSM), Indian sample in `samples/` | done, 29/29 CPU tests (`tests/test_dsm_cpu.py`) — **real-model run pending on a GPU** |
 
-**Measured so far** (RS3DAda zero-shot, 40 GAMUS test tiles, see `progression.md`):
-overall RMSE 6.74 m / MAE 3.47 m / r 0.60; urban 5.11 m; sparse 2.83 m; forest 11.87 m.
+**Measured** (40 held-out GAMUS test tiles, LiDAR truth; full tables in [`RESULTS.md`](RESULTS.md)):
+
+| model | overall RMSE | MAE | r | urban | sparse | forest |
+|---|---|---|---|---|---|---|
+| predict zero (floor) | 9.35 m | 5.10 m | — | 8.81 m | 4.21 m | 13.66 m |
+| RS3DAda zero-shot | 6.74 m | 3.47 m | 0.60 | **5.11 m** | 2.83 m | 11.87 m |
+| DINOv3-SAT head (ours) | **4.96 m** | **2.44 m** | **0.78** | 5.28 m | **2.15 m** | **5.91 m** |
+
+The head wins overall and halves forest error; urban is the one bucket where RS3DAda is still slightly better.
 
 ## Where to start
 

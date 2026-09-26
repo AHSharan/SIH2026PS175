@@ -35,8 +35,8 @@ Pipeline:
 
 Measured results (GAMUS dataset, US cities, LiDAR ground truth, 40 held-out test tiles at 0.3 m):
 - RS3DAda zero-shot: RMSE 6.74 m, MAE 3.47 m, correlation 0.60 overall; urban 5.11 / 2.68 m (r 0.76); sparse 2.83 / 1.43 m (r 0.68); forest 11.87 / 7.87 m (r 0.31).
-- Forest is the documented failure mode: canopy is under-predicted by about 7 m on average, which is why we train the satellite-pretrained DINOv3 head on real LiDAR heights.
-- [[DINOv3-SAT head: RMSE __ m overall (urban __, sparse __, forest __), on the same 40 tiles]]
+- Forest is the documented failure mode: canopy is under-predicted by about 7 m on average, which is why we trained the satellite-pretrained DINOv3 head on real LiDAR heights.
+- DINOv3-SAT head (ours), same 40 tiles: RMSE 4.96 m, MAE 2.44 m, correlation 0.78 overall - 26% lower RMSE than RS3DAda. Forest 5.91 m (was 11.87 m, and the canopy bias shrank from -7.07 m to -0.20 m); sparse 2.15 m (was 2.83 m). Urban is the one bucket that did not improve: 5.28 m vs RS3DAda's 5.11 m.
 
 Rigour: every figure comes from a real run. The evaluation harness was self-tested (ground truth scored against itself gives a fully explained 0.13 m noise floor). Dataset traps were found and fixed before any number was produced - for example, one city's files use a different naming suffix, and naive pairing silently drops exactly the tiles with the tallest buildings. Negative results are reported too: GSD normalisation gave no gain for a backbone already trained across 0.05-1 m GSD. Honest limits: all accuracy is measured on US aerial data, so ISRO Cartosat imagery will differ, and DSM accuracy in hilly terrain is bounded by the 30 m DEM, not by the model.
 ```
@@ -78,12 +78,24 @@ RS3DAda zero-shot, GSD normalisation + tiling + flip TTA:
   sparse   RMSE 2.83 m  MAE 1.43 m                r 0.684
   forest   RMSE 11.87 m MAE 7.87 m                r 0.306
 Ablation: raw inference 6.82 m -> + GSD normalisation 6.82 m (no gain; urban slightly worse) -> + tiling/TTA 6.74 m.
-[[DINOv3-SAT head, same 40 tiles: overall RMSE __ m, MAE __ m, r __; forest RMSE __ m]]
-[[GSD robustness, simulated 0.3 / 0.5 / 0.75 / 1.0 m input: RMSE __ / __ / __ / __ m]]
+DINOv3-SAT head (ours), frozen encoder + trained DPT head, same 40 tiles:
+  overall  RMSE 4.96 m  MAE 2.44 m  bias -0.52 m  r 0.780
+  urban    RMSE 5.28 m  MAE 2.40 m                r 0.726
+  sparse   RMSE 2.15 m  MAE 1.12 m                r 0.829
+  forest   RMSE 5.91 m  MAE 3.87 m                r 0.807
+Predict-zero floor on the same tiles: overall 9.35 m, urban 8.81 m, sparse 4.21 m, forest 13.66 m.
+Model selected on the validation split (best val RMSE 3.765 m, epoch 22 of 30), never on test.
+GSD robustness (test images degraded to each GSD, scored against ground truth resampled to the same grid):
+  input GSD      0.30   0.50   0.75   1.00 m
+  DINOv3 head    4.85   4.60   4.68   5.46 m RMSE
+  RS3DAda        6.82   6.70   6.83   6.92 m RMSE
+  The head stays ahead at every resolution but degrades more at 1.0 m (it trains at a fixed 0.5 m). Coarser ground truth is also smoother, so part of each change is the target, not only the model.
 
 8. WHAT THE NUMBERS TELL US
-- Urban and sparse areas work zero-shot (correlation 0.76 and 0.68). [[Versus the predict-zero floor on the same 40 tiles: __% lower RMSE on urban, __% on sparse - from RESULTS.md]]
-- Forest is the failure mode: correlation only 0.31, and canopy is under-predicted by 7.07 m on average. [[Forest RMSE vs the same-tile predict-zero floor: __ m vs __ m - from RESULTS.md]] This is why we train a satellite-pretrained encoder on real LiDAR heights.
+- Urban and sparse areas work zero-shot (correlation 0.76 and 0.68). Versus the predict-zero floor on the same 40 tiles: 42% lower RMSE on urban (5.11 vs 8.81 m) and 33% on sparse (2.83 vs 4.21 m).
+- Forest is the failure mode: correlation only 0.31, and canopy is under-predicted by 7.07 m on average. RS3DAda forest RMSE was 11.87 m against a predict-zero floor of 13.66 m - barely better than guessing zero. This is why we trained a satellite-pretrained encoder on real LiDAR heights.
+- It worked: the DINOv3-SAT head halves forest RMSE (11.87 -> 5.91 m), lifts forest correlation from 0.31 to 0.81, and removes the canopy bias (-7.07 -> -0.20 m). Overall RMSE drops 26% (6.74 -> 4.96 m).
+- Honest limit: urban did not improve (5.28 m vs 5.11 m; r 0.73 vs 0.76). RS3DAda remains slightly better on buildings, so urban is our next target (e.g. unfreezing the last encoder blocks, or using RS3DAda in urban areas).
 - GSD normalisation - often assumed essential - gave no gain on a backbone trained across many resolutions. We report that rather than drop it. It does matter for our DINOv3 head, which trains at one fixed 0.5 m GSD.
 
 9. VISUALISATION LAYER (built and running)
@@ -134,9 +146,11 @@ in the repo's `shots/` folder. Keep the file **under 10 MB** (export images as J
 
 | model (40 held-out GAMUS tiles) | RMSE | MAE | r | forest RMSE |
 |---|---|---|---|---|
-| predict zero (floor) | [[from RESULTS.md]] | | | |
+| predict zero (floor) | 9.35 m | 5.10 m | — | 13.66 m |
 | RS3DAda zero-shot | 6.74 m | 3.47 m | 0.60 | 11.87 m |
-| DINOv3-SAT head (ours) | [[ ]] | [[ ]] | [[ ]] | [[ ]] |
+| DINOv3-SAT head (ours) | **4.96 m** | **2.44 m** | **0.78** | **5.91 m** |
+
+Footnote on the slide: urban RMSE 5.28 m (ours) vs 5.11 m (RS3DAda) — the one bucket we did not improve.
 
 - Images: `shots/08_walls_gradient.jpg` (textured 3D) and the **error-overlay screenshot** from the real predictions (see "Viewer screenshots with real predictions" below)
 
