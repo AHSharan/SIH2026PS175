@@ -22,16 +22,22 @@ Final product: `DSM = DEM(terrain) + nDSM(objects)`.
 
 | Component | State |
 |---|---|
-| `data.py` — GAMUS loader | done, verified against real files |
-| `eval.py` — metrics harness | done, self-tested (see below) |
-| `predict.py` — tiled inference + GSD normalisation | written, unit-tested on CPU |
-| `web/` — Three.js flythrough | working, 1.05M verts |
-| `calibrate.py` | not started |
-| `train_head.py` | not started |
+| `data.py` — GAMUS loader + deterministic tile selection | done, verified against real files and the Kaggle tile set |
+| `eval.py` — metrics harness | done, self-tested (0.13 m noise floor) |
+| `predict.py` — tiled inference, GSD normalisation, TTA | done, 5/5 CPU tests, **ran on Kaggle T4** |
+| `calibrate.py` — ground shift + robust affine | done, 5/5 tests on real tiles |
+| `train_head.py` — frozen DINOv3-SAT + trained DPT head | done, 19/19 CPU tests (`tests/`) — **real run pending on Colab** |
+| `colab_train.py` — cache -> train -> eval, resumable | done, full dry run + disconnect/resume verified |
+| `web/` — Three.js flythrough | working; prediction mode (error overlay, live RMSE) verified |
 
-**No model has been run yet.** The only numbers in `progression.md` so far are
-trivial floors (`predict 0 everywhere`), clearly tagged as such. They exist to
-be beaten, not to be quoted.
+**Measured so far** (RS3DAda zero-shot, 40 GAMUS test tiles, see `progression.md`):
+overall RMSE 6.74 m / MAE 3.47 m / r 0.60; urban 5.11 m; sparse 2.83 m; forest 11.87 m.
+
+## Where to start
+
+- **Training the model** (no coding needed): [`COLAB.md`](COLAB.md)
+- **Submission form text + slide content**: [`SUBMISSION.md`](SUBMISSION.md)
+- **Every measured number**: [`progression.md`](progression.md), and `RESULTS.md` from the Colab run
 
 ## Verified dataset facts (measured, not assumed)
 
@@ -81,7 +87,13 @@ python export_viewer.py --n 3                     # build viewer assets
 python serve.py                                   # http://localhost:8777
 ```
 
-GPU inference runs on Kaggle — see `kaggle_run.py`.
+GPU inference runs on Kaggle — see `kaggle_run.py`. Training runs on Colab — see `COLAB.md`.
+
+```bash
+python tests/test_train_head_cpu.py                # 19 CPU tests, needs gamus/test tiles
+```
+
+Viewer with real predictions: copy the Colab `viewer_assets/` into `web/assets_pred/`, then open `http://localhost:8777/?assets=assets_pred`.
 
 ## Model backend
 

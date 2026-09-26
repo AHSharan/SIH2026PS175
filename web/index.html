@@ -157,6 +157,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 
 const $=id=>document.getElementById(id);
+const ASSETS=new URLSearchParams(location.search).get('assets')||'assets';
 const MESH_N=1024;              // mesh grid resolution (verts per side)
 
 /* ---------------------------------------------------------------- scene */
@@ -357,15 +358,15 @@ function worldToPx(x,z){
 /* ----------------------------------------------------------- scene load */
 async function loadScene(name){
   $('loading').style.display='grid';
-  const meta=await (await fetch(`assets/${name}_meta.json`)).json();
-  const hbuf=await (await fetch(`assets/${name}_h.bin`)).arrayBuffer();
+  const meta=await (await fetch(`${ASSETS}/${name}_meta.json`)).json();
+  const hbuf=await (await fetch(`${ASSETS}/${name}_h.bin`)).arrayBuffer();
   const heights=new Float32Array(hbuf);
   let ref=null;
   if(meta.has_reference){
-    try{ref=new Float32Array(await (await fetch(`assets/${name}_ref.bin`)).arrayBuffer());}
+    try{ref=new Float32Array(await (await fetch(`${ASSETS}/${name}_ref.bin`)).arrayBuffer());}
     catch(e){ref=null;}
   }
-  texMap=await new THREE.TextureLoader().loadAsync(`assets/${name}_tex.jpg`);
+  texMap=await new THREE.TextureLoader().loadAsync(`${ASSETS}/${name}_tex.jpg`);
   texMap.colorSpace=THREE.SRGBColorSpace;
   texMap.anisotropy=renderer.capabilities.getMaxAnisotropy();
 
@@ -511,9 +512,7 @@ function pick(e){
   const hit=ray.intersectObject(mesh,false);
   return hit.length?hit[0].point:null;
 }
-function probe(e){
-  const p=pick(e); if(!p)return;
-  const [px,py]=worldToPx(p.x,p.z);
+function showProbe(px,py){
   const h=heightAt(px,py);
   $('p-h').textContent=h.toFixed(2)+' m';
   $('p-s').textContent=slopeAt(px,py).toFixed(1)+'°';
@@ -522,6 +521,12 @@ function probe(e){
     const e2=h-S.ref[Math.round(py)*S.W+Math.round(px)];
     $('p-e').textContent=(e2>=0?'+':'')+e2.toFixed(2)+' m';
   }
+  return h;
+}
+function probe(e){
+  const p=pick(e); if(!p)return;
+  const [px,py]=worldToPx(p.x,p.z);
+  showProbe(px,py);
 }
 $('measure').onclick=()=>{
   measuring=!measuring; measurePts=[];
@@ -557,11 +562,7 @@ window.DW={setMode:m=>{const b=document.querySelector(`[data-mode="${m}"]`);
     camera.position.set(dist*Math.cos(e)*Math.sin(a),dist*Math.sin(e),
                         dist*Math.cos(e)*Math.cos(a));
     lookAtPoint(new THREE.Vector3(0,S.meta.h_p99*vex*0.35,0));},
-  probeAt:(px,py)=>{const h=heightAt(px,py);
-    $('p-h').textContent=h.toFixed(2)+' m';
-    $('p-s').textContent=slopeAt(px,py).toFixed(1)+'°';
-    $('p-xy').textContent=`${px.toFixed(0)}, ${py.toFixed(0)} px`;
-    return h;},
+  probeAt:(px,py)=>showProbe(px,py),
   // render and read back in the SAME tick, else the buffer is already cleared.
   // Capture at the canvas's native backing size (devicePixelRatio already
   // gives us 2400x1350); resizing the renderer mid-capture mis-framed the view.
@@ -594,7 +595,7 @@ new ResizeObserver(fit).observe(document.body);
 
 /* --------------------------------------------------------------- boot */
 (async()=>{
-  const scenes=await (await fetch('assets/scenes.json')).json();
+  const scenes=await (await fetch(`${ASSETS}/scenes.json`)).json();
   const sel=$('scene');
   scenes.forEach(n=>{const o=document.createElement('option');o.value=o.textContent=n;sel.appendChild(o);});
   sel.onchange=()=>loadScene(sel.value);

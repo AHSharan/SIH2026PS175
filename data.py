@@ -215,14 +215,20 @@ def describe(records, n: int = 5, gsd: float = GAMUS_GSD_M):
 # --------------------------------------------------------------------------
 # convenience: fetch a subset from HuggingFace without pulling all 80 GB
 # --------------------------------------------------------------------------
-def fetch_gamus_subset(split: str = "test", n: int = 20, out_dir: str = "gamus",
-                       repo: str = "earthflow/GAMUS", city: str | None = None,
-                       seed: int = 0, with_cls: bool = True):
-    """hf_hub_download individual tiles only. Returns dirs (rgb, height, cls)."""
-    from huggingface_hub import HfApi, hf_hub_download
-    import shutil
-    api = HfApi()
-    files = api.list_repo_files(repo, repo_type="dataset")
+def gamus_index(split: str = "test", n: int = 20, repo: str = "earthflow/GAMUS",
+                city: str | None = None, seed: int = 0, with_cls: bool = True,
+                files=None, verbose: bool = True):
+    """Deterministic tile selection WITHOUT downloading anything.
+
+    Returns [{tile_id, rgb, height[, cls]}] with repo-relative paths. The
+    selection logic is exactly what fetch_gamus_subset has always used, so the
+    same (split, n, seed, city, with_cls) always yields the same tiles - which is
+    what makes results from different machines (Kaggle, Colab) comparable.
+    """
+    if files is None:
+        from huggingface_hub import HfApi
+        files = HfApi().list_repo_files(repo, repo_type="dataset")
+
     # The modality dirs have equal counts but are NOT stem-aligned (verified:
     # heights/test/NYC_12714_AGL.h5 exists, images/test/NYC_12714_RGB.h5 404s).
     # So intersect stems instead of assuming.
@@ -234,13 +240,11 @@ def fetch_gamus_subset(split: str = "test", n: int = 20, out_dir: str = "gamus",
     if city:
         stems_set = {s for s in stems_set if s.startswith(city)}
     stems = sorted(stems_set)
-    print(f"[data] {len(stems)} stems present in all modalities for split={split}")
+    if verbose:
+        print(f"[data] {len(stems)} stems present in all modalities for split={split}")
     rng = np.random.default_rng(seed)
     stems = list(rng.choice(stems, min(n, len(stems)), replace=False)) if n < len(stems) else stems
 
-    dirs = {m: os.path.join(out_dir, split, m) for m in ("images", "heights", "classes")}
-    for d in dirs.values():
-        os.makedirs(d, exist_ok=True)
     # RGB suffix varies by city (_RGB vs _IMG) -> resolve from the file list
     rgb_suffix = {}
     for f in files:
@@ -248,17 +252,40 @@ def fetch_gamus_subset(split: str = "test", n: int = 20, out_dir: str = "gamus",
             base = os.path.splitext(os.path.basename(f))[0]
             rgb_suffix[stem_of(base)] = base.rsplit("_", 1)[-1]
 
+    out = []
     for s in stems:
-        mods = [("images", rgb_suffix.get(s, "RGB")), ("heights", "AGL")]
+        s = str(s)
+        rec = {"tile_id": s,
+               "rgb": f"images/{split}/{s}_{rgb_suffix.get(s, 'RGB')}.h5",
+               "height": f"heights/{split}/{s}_AGL.h5"}
         if with_cls:
-            mods.append(("classes", "CLS"))
-        for mod, suf in mods:
-            dst = os.path.join(dirs[mod], f"{s}_{suf}.h5")
+            rec["cls"] = f"classes/{split}/{s}_CLS.h5"
+        out.append(rec)
+    return out
+
+
+def fetch_gamus_subset(split: str = "test", n: int = 20, out_dir: str = "gamus",
+                       repo: str = "earthflow/GAMUS", city: str | None = None,
+                       seed: int = 0, with_cls: bool = True):
+    """hf_hub_download individual tiles only. Returns dirs (rgb, height, cls)."""
+    from huggingface_hub import hf_hub_download
+    import shutil
+    recs = gamus_index(split, n, repo, city, seed, with_cls)
+
+    dirs = {m: os.path.join(out_dir, split, m) for m in ("images", "heights", "classes")}
+    for d in dirs.values():
+        os.makedirs(d, exist_ok=True)
+    for rec in recs:
+        keys = [("images", rec["rgb"]), ("heights", rec["height"])]
+        if with_cls:
+            keys.append(("classes", rec["cls"]))
+        for mod, rp in keys:
+            dst = os.path.join(dirs[mod], os.path.basename(rp))
             if os.path.exists(dst):
                 continue
-            src = hf_hub_download(repo, f"{mod}/{split}/{s}_{suf}.h5", repo_type="dataset")
+            src = hf_hub_download(repo, rp, repo_type="dataset")
             shutil.copyfile(src, dst)
-    print(f"[data] fetched {len(stems)} tiles ({split}) -> {out_dir}")
+    print(f"[data] fetched {len(recs)} tiles ({split}) -> {out_dir}")
     return dirs["images"], dirs["heights"], dirs["classes"]
 
 
