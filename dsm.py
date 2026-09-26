@@ -318,7 +318,41 @@ def export_viewer(out_dir, name, rgb, surf, gsd, kind, meta_extra, max_px=1024):
 # ==========================================================================
 # pipeline
 # ==========================================================================
-def get_backend(name, ckpt=None, synrs3d_dir="SynRS3D"):
+# per-model inference settings - the SAME ones the GAMUS test numbers used
+BACKENDS = {
+    "rs3dada": {"label": "RS3DAda (SynRS3D)", "tile": P.RS3DADA_PATCH,
+                "patch": 14, "model_gsd": P.RS3DADA_TRAIN_GSD},
+    # colab_train.py: tile = work_size(1024 px @ 0.3 m -> 0.5 m, /16) = 608
+    "dinov3": {"label": "DINOv3-SAT head (ours, trained on GAMUS)", "tile": 608,
+               "patch": 16, "model_gsd": 0.5},
+    "dummy": {"label": "DUMMY - plumbing test, not a real prediction",
+              "tile": P.RS3DADA_PATCH, "patch": 14, "model_gsd": P.RS3DADA_TRAIN_GSD},
+}
+DEFAULT_HEAD = os.path.join("dw_run", "ckpt", "best.pt")
+
+
+def get_dinov3(head_path=None):
+    head_path = head_path or DEFAULT_HEAD
+    if not os.path.exists(head_path):
+        raise SystemExit(
+            f"trained head not found: {head_path}\n"
+            "  Copy best.pt from the training run (Google Drive or the training PC:\n"
+            "  dw_run/ckpt/best.pt) into this repo at dw_run/ckpt/best.pt,\n"
+            "  or pass its location with --head <path to best.pt>.")
+    import train_head as TH
+    try:
+        enc = TH.DinoV3Encoder()
+    except RuntimeError as e:
+        raise SystemExit(f"{e}\n  On this PC run:  hf auth login   (a Read token from an "
+                         "account that accepted the DINOv3 licence), then try again.")
+    head, ck = TH.load_head(head_path, device=enc.device)
+    print(f"[DINOv3] head {head_path} (epoch {ck.get('epoch')}) on {enc.device}")
+    return TH.make_predict_fn(enc, head)
+
+
+def get_backend(name, ckpt=None, synrs3d_dir="SynRS3D", head=None):
+    if name == "dinov3":
+        return get_dinov3(head)
     if name == "dummy":
         print("[model] DUMMY backend (darkness -> fake height). "
               "Plumbing test only: these heights mean nothing.")
@@ -334,9 +368,12 @@ def get_backend(name, ckpt=None, synrs3d_dir="SynRS3D"):
 
 
 def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
-        model_gsd=P.RS3DADA_TRAIN_GSD, tta=True, tile=P.RS3DADA_PATCH,
+        model_gsd=None, tta=True, tile=None,
         dem=None, export=None, name=None, ckpt=None, synrs3d_dir="SynRS3D",
-        source_note=None):
+        source_note=None, head=None):
+    cfg = BACKENDS.get(backend, BACKENDS["rs3dada"])
+    model_gsd = model_gsd or cfg["model_gsd"]
+    tile = tile or cfg["tile"]
     t0 = time.time()
     os.makedirs(out, exist_ok=True)
     img = read_image(image, window)
@@ -355,15 +392,15 @@ def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
         in_gsd = gsd
         print(f"[image] {W}x{H} px, NO georeference, GSD {in_gsd} m (from --gsd)")
 
-    fn = fn or get_backend(backend, ckpt, synrs3d_dir)
+    fn = fn or get_backend(backend, ckpt, synrs3d_dir, head)
     t1 = time.time()
     ndsm = P.predict_height(rgb, fn, input_gsd=in_gsd, model_gsd=model_gsd,
-                            tile=tile, tta=tta, verbose=True)
+                            tile=tile, tta=tta, patch_multiple=cfg["patch"],
+                            verbose=True)
     ndsm[~valid] = np.nan
     print(f"[model] nDSM done in {time.time()-t1:.0f} s")
 
-    base_tags = {"PRODUCT": "", "MODEL": "RS3DAda (SynRS3D)" if backend != "dummy"
-                 else "DUMMY - plumbing test, not a real prediction",
+    base_tags = {"PRODUCT": "", "MODEL": cfg["label"],
                  "INPUT_IMAGE": image, "INPUT_GSD_M": round(in_gsd, 4),
                  "MODEL_GSD_M": model_gsd, "TTA": tta}
     if source_note:
@@ -553,12 +590,18 @@ def main():
                          "for GeoTIFFs unless it differs")
     ap.add_argument("--dem", nargs="*", default=None,
                     help="local DEM GeoTIFF(s) instead of fetching Copernicus GLO-30")
-    ap.add_argument("--backend", choices=["rs3dada", "dummy"], default="rs3dada")
+    ap.add_argument("--backend", choices=list(BACKENDS), default="rs3dada",
+                    help="rs3dada (default, public weights) or dinov3 (our trained "
+                         "head: needs --head best.pt and a DINOv3 HuggingFace login)")
+    ap.add_argument("--head", default=None,
+                    help=f"trained DINOv3 head checkpoint (default {DEFAULT_HEAD})")
     ap.add_argument("--ckpt", default=None)
     ap.add_argument("--synrs3d-dir", default="SynRS3D")
-    ap.add_argument("--model-gsd", type=float, default=P.RS3DADA_TRAIN_GSD)
-    ap.add_argument("--tile", type=int, default=P.RS3DADA_PATCH,
-                    help="model tile (multiple of 14); 518 if the GPU runs out of memory")
+    ap.add_argument("--model-gsd", type=float, default=None,
+                    help="default: the GSD the chosen model was trained at (0.5 m)")
+    ap.add_argument("--tile", type=int, default=None,
+                    help="model tile in px (multiple of 14 for rs3dada, 16 for dinov3); "
+                         "smaller (e.g. 518 / 512) if the GPU runs out of memory")
     ap.add_argument("--no-tta", action="store_true")
     ap.add_argument("--export", default="web/assets_dsm",
                     help="viewer asset folder ('' to skip)")
@@ -575,14 +618,15 @@ def main():
     image, dem, credit, name = a.image, a.dem, a.credit, a.name
     if image is None:
         image, dem = SAMPLE["rgb"], dem or [SAMPLE["dem"]]
-        credit, name = credit or SAMPLE["credit"], name or "chungthang"
+        credit = credit or SAMPLE["credit"]
+        name = name or ("chungthang" if a.backend == "rs3dada" else f"chungthang_{a.backend}")
     window = tuple(int(v) for v in a.window.split(",")) if a.window else None
     out = a.out or os.path.join("out_dsm", name or
                                 os.path.splitext(os.path.basename(image))[0])
     rep = run(image, out, backend=a.backend, window=window, gsd=a.gsd,
               model_gsd=a.model_gsd, tta=not a.no_tta, tile=a.tile, dem=dem,
               export=a.export or None, name=name, ckpt=a.ckpt,
-              synrs3d_dir=a.synrs3d_dir, source_note=credit)
+              synrs3d_dir=a.synrs3d_dir, source_note=credit, head=a.head)
     print(f"[saved] plain-English numbers: {os.path.abspath(os.path.join(out, 'SUMMARY.txt'))}")
     if not a.no_zip:
         zip_results(out.rstrip("/\\") + "_results.zip", out, a.export,
