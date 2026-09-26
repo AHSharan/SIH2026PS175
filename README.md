@@ -29,7 +29,7 @@ Final product: `DSM = DEM(terrain) + nDSM(objects)`.
 | `train_head.py` — frozen DINOv3-SAT + trained DPT head | done, 19/19 CPU tests (`tests/`) — **real run pending on Colab** |
 | `colab_train.py` — cache -> train -> eval, resumable | done, full dry run + disconnect/resume verified |
 | `web/` — Three.js flythrough | working; prediction mode (error overlay, live RMSE) verified |
-| `dsm.py` — GeoTIFF in -> DSM GeoTIFF out (DEM + nDSM), Indian sample in `samples/` | done, 27/27 CPU tests (`tests/test_dsm_cpu.py`) — **real-model run pending on a GPU** |
+| `dsm.py` — GeoTIFF in -> DSM GeoTIFF out (DEM + nDSM), Indian sample in `samples/` | done, 29/29 CPU tests (`tests/test_dsm_cpu.py`) — **real-model run pending on a GPU** |
 
 **Measured so far** (RS3DAda zero-shot, 40 GAMUS test tiles, see `progression.md`):
 overall RMSE 6.74 m / MAE 3.47 m / r 0.60; urban 5.11 m; sparse 2.83 m; forest 11.87 m.
@@ -37,7 +37,7 @@ overall RMSE 6.74 m / MAE 3.47 m / r 0.60; urban 5.11 m; sparse 2.83 m; forest 1
 ## Where to start
 
 - **Training the model** (no coding needed): [`COLAB.md`](COLAB.md)
-- **Indian DSM GeoTIFF (Chungthang, Sikkim)**: [`DSM.md`](DSM.md)
+- **Indian DSM GeoTIFF (Chungthang, Sikkim)**: [`DSM.md`](DSM.md) · non-technical step-by-step: [`RUN_DSM_SIMPLE.md`](RUN_DSM_SIMPLE.md)
 - **Submission form text + slide content**: [`SUBMISSION.md`](SUBMISSION.md)
 - **Every measured number**: [`progression.md`](progression.md), and `RESULTS.md` from the Colab run
 

@@ -37,11 +37,14 @@ timed on a GPU yet). The last lines look like this:
 
 If it says `CUDA out of memory`, run `python dsm.py --tile 518` instead.
 
-## What to send the team lead
+## Where the results are saved
 
-1. The `out_dsm/chungthang/` folder, zipped. It holds `dsm.tif`, `ndsm.tif`,
-   `dem.tif` and `report.json`.
-2. The `web/assets_dsm/` folder, zipped (the viewer scene).
+- `out_dsm/chungthang_results.zip`: **everything in one file** (the GeoTIFFs,
+  `report.json`, `SUMMARY.txt` and the viewer scene). This is the one to share.
+- `out_dsm/chungthang/SUMMARY.txt`: the key numbers in plain words.
+
+A step-by-step version for non-technical users is in
+[`RUN_DSM_SIMPLE.md`](RUN_DSM_SIMPLE.md).
 
 ## Look at it in 3D
 
@@ -63,6 +66,7 @@ Set *Vertical exaggeration* to 1.0× to see the true valley shape.
 | `ndsm.tif` | model output: height above ground (m), RS3DAda, GSD-normalised to 0.5 m, with TTA |
 | `dem.tif` | Copernicus GLO-30 terrain, bilinearly resampled to the image grid |
 | `report.json` | where every input came from, plus the sanity checks below |
+| `SUMMARY.txt` | the same key numbers in plain words |
 
 **Other images.** Pass any GeoTIFF (a local path or an `https://` URL; add
 `--window col,row,width,height` for a crop):
@@ -108,10 +112,10 @@ automatically. To use CartoDEM or any other DEM instead:
 
 ## Tested here (no GPU)
 
-`python tests/test_dsm_cpu.py` → **27/27 pass**. It checks CRS/transform
+`python tests/test_dsm_cpu.py` → **29/29 pass**. It checks CRS/transform
 preservation, DSM = DEM + nDSM exactly, reprojection from a DEM in a different
 CRS (exact to 0.01 m), degree→metre GSD, scene-fill masking, window crops,
-the PNG path, GLO-30 tile naming, and the Chungthang sample end to end. The
+the PNG path, GLO-30 tile naming, the summary file and the results zip, and the Chungthang sample end to end. The
 whole pipeline also ran on the sample with a fake model, and the viewer
 rendered the scene. What we could **not** run here is the real RS3DAda model on
 this image: this cloud machine has no GPU and can't reach HuggingFace. That's
