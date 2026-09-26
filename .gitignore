@@ -7,3 +7,5 @@ __pycache__/
 gsd_check.png
 web/_test_assets/
 dw_run/
+out_dsm/
+web/assets_dsm/
