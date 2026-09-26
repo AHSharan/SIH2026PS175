@@ -123,7 +123,7 @@
   <h2>Scene stats</h2>
   <div class="kv"><span>Extent</span><b id="s-ext">—</b></div>
   <div class="kv"><span>GSD</span><b id="s-gsd">—</b></div>
-  <div class="kv"><span>Max height</span><b id="s-max">—</b></div>
+  <div class="kv"><span id="s-maxl">Max height</span><b id="s-max">—</b></div>
 
   <div id="valblock" style="display:none">
     <h2>Validation vs reference</h2>
@@ -318,7 +318,7 @@ uniform float uHMax;
   float hfrac = clamp(vWorldY / max(uHMax, 1.0), 0.0, 1.0);
   vec3 facade = mix(vec3(0.17,0.18,0.21), vec3(0.42,0.43,0.47), hfrac);
   diffuseColor.rgb = mix(diffuseColor.rgb, facade, clamp(vWall,0.0,1.0));`);
-    sh.uniforms.uHMax={value:(S?S.meta.h_p99*vex:40.0)};
+    sh.uniforms.uHMax={value:(S?(S.meta.h_p99-base())*vex:40.0)};
     mat.userData.sh=sh;
   };
   mat.customProgramCacheKey=()=>'wall';
@@ -397,6 +397,7 @@ async function loadScene(name){
 
   $('s-ext').textContent=`${meta.extent_m[0].toFixed(0)}×${meta.extent_m[1].toFixed(0)} m`;
   $('s-gsd').textContent=meta.gsd_m+' m'+(meta.gsd_asserted?'*':'');
+  $('s-maxl').textContent=meta.kind==='dsm'?'Max elevation':'Max height';
   $('s-max').textContent=meta.h_max.toFixed(1)+' m';
 
   $('btn-error').disabled=!ref;
@@ -654,7 +655,7 @@ window.DW={setMode:m=>{const b=document.querySelector(`[data-mode="${m}"]`);
   orbitTo:(azDeg,elDeg,dist)=>{const a=azDeg*Math.PI/180,e=elDeg*Math.PI/180;
     camera.position.set(dist*Math.cos(e)*Math.sin(a),dist*Math.sin(e),
                         dist*Math.cos(e)*Math.cos(a));
-    lookAtPoint(new THREE.Vector3(0,S.meta.h_p99*vex*0.35,0));},
+    lookAtPoint(new THREE.Vector3(0,(S.meta.h_p99-base())*vex*0.35,0));},
   probeAt:(px,py)=>showProbe(px,py),
   // render and read back in the SAME tick, else the buffer is already cleared.
   // Capture at the canvas's native backing size (devicePixelRatio already
