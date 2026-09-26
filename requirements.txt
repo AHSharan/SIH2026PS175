@@ -1,0 +1,10 @@
+# PyTorch is installed separately so you get the build matching your GPU:
+#   https://pytorch.org/get-started/locally/
+numpy
+scipy
+h5py
+pillow
+matplotlib
+huggingface_hub[hf_xet]
+transformers>=4.56
+rasterio

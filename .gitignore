@@ -6,3 +6,4 @@ __pycache__/
 .ipynb_checkpoints/
 gsd_check.png
 web/_test_assets/
+dw_run/

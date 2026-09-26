@@ -100,6 +100,17 @@ def now():
 # --------------------------------------------------------------------------
 # setup
 # --------------------------------------------------------------------------
+def _in_colab():
+    import importlib.util
+    try:                          # the google.colab package only exists on Colab VMs
+        return importlib.util.find_spec("google.colab") is not None
+    except (ImportError, ValueError):
+        return False
+
+
+IN_COLAB = _in_colab()
+
+
 def resolve_paths():
     root = os.environ.get("DW_ROOT")
     persistent = True
@@ -107,10 +118,13 @@ def resolve_paths():
         drive = "/content/drive/MyDrive"
         if os.path.isdir(drive):
             root = os.path.join(drive, "depthwizard")
-        else:
+        elif IN_COLAB:
             root, persistent = "/content/depthwizard_NOT_ON_DRIVE", False
+        else:
+            # own machine (e.g. a university GPU box): local disk already persists
+            root = os.path.join(HERE, "dw_run")
     local = os.environ.get("DW_LOCAL") or (
-        "/content/dw_local" if os.path.isdir("/content") else os.path.join(root, "_local"))
+        "/content/dw_local" if IN_COLAB else os.path.join(root, "_local"))
     cache_root = os.path.join(root if CFG["CACHE_ON_DRIVE"] else local, "cache")
     p = {"root": root, "local": local, "persistent": persistent,
          "cache_train": os.path.join(cache_root, "train"),
@@ -140,13 +154,26 @@ def check_env():
     except Exception as e:                                      # noqa: BLE001
         log(f"[setup] transformers not importable: {e}")
     if not gpu and not CFG["FAKE_ENCODER"]:
-        raise SystemExit("!! No GPU. Runtime -> Change runtime type -> T4 GPU -> Save. "
-                         "Then run cell 1 and cell 2 again.")
+        if IN_COLAB:
+            raise SystemExit("!! No GPU. Runtime -> Change runtime type -> T4 GPU -> Save. "
+                             "Then run cell 1 and cell 2 again.")
+        raise SystemExit("!! PyTorch cannot see a GPU. On your own machine install the CUDA "
+                         "build of PyTorch (see RUN_LOCAL.md step 2), then run again.")
 
 
 def hf_token():
     t = os.environ.get("HF_TOKEN")
     if t:
+        return t
+    if not IN_COLAB:
+        try:                      # `hf auth login` stores a token on disk
+            from huggingface_hub import get_token
+            t = get_token()
+        except Exception:                                       # noqa: BLE001
+            t = None
+        if not t:
+            log("[setup] no HuggingFace token found. Run  hf auth login  once "
+                "(see RUN_LOCAL.md step 3) - DINOv3 is gated.")
         return t
     try:
         from google.colab import userdata

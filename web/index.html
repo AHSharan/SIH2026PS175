@@ -52,6 +52,10 @@
   #crosshair:before{left:6px;top:0;width:2px;height:14px}
   #crosshair:after{top:6px;left:0;height:2px;width:14px}
   body.fly #crosshair{opacity:1}
+  #profile{bottom:14px;right:14px;width:392px;display:none}
+  #profile svg{display:block;width:100%;height:150px;background:#0d131d;border-radius:6px}
+  .lg{display:inline-flex;align-items:center;gap:5px;margin-right:12px;font-size:11px;color:var(--dim)}
+  .lg i{width:14px;height:3px;border-radius:2px;display:inline-block}
   #toast{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);
     background:#131924f2;border:1px solid var(--line);border-radius:8px;
     padding:9px 15px;opacity:0;transition:opacity .3s;pointer-events:none;
@@ -77,6 +81,10 @@
   <h2>Scene</h2>
   <select id="scene"></select>
   <div style="margin-top:7px"><span id="srcbadge" class="badge gt">—</span></div>
+  <div class="row" id="srcrow" style="display:none">
+    <button id="src-pred" class="active">Model</button>
+    <button id="src-ref">LiDAR truth</button>
+  </div>
 
   <h2>Surface</h2>
   <div class="row">
@@ -144,6 +152,13 @@
   </div>
 </div>
 
+<div class="panel" id="profile">
+  <h2 style="margin-top:0">Height profile <span class="val" id="prof-d"></span></h2>
+  <svg id="prof-svg" viewBox="0 0 360 150" preserveAspectRatio="none"></svg>
+  <div id="prof-leg" style="margin-top:6px"></div>
+  <div id="prof-stat" style="font-size:11.5px;margin-top:3px;font-variant-numeric:tabular-nums"></div>
+</div>
+
 <div id="toast"></div>
 
 <script type="importmap">
@@ -194,6 +209,8 @@ orbit.enableDamping=true;orbit.dampingFactor=0.08;orbit.enabled=false;
 let S=null;          // {meta,heights,ref,W,H,gsd,extentX,extentY}
 let mesh=null, ground=null, vex=2.0, mode='tex', texMap=null;
 let measuring=false, measurePts=[], measureLine=null;
+let surf='pred';                          // which surface the mesh shows: 'pred' | 'ref'
+const base=()=>(S&&S.meta&&S.meta.h_base)||0;   // DSM scenes: lowest elevation in view
 
 const toast=(m,ms=2600)=>{const t=$('toast');t.textContent=m;t.classList.add('show');
   clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),ms);};
@@ -230,12 +247,12 @@ function buildMesh(){
   const geo=new THREE.PlaneGeometry(EX,EY,N-1,N-1);
   geo.rotateX(-Math.PI/2);                 // XZ ground plane, +Y up
 
-  const pos=geo.attributes.position;
+  const pos=geo.attributes.position, B=base();
   for(let j=0;j<N;j++){
     const sy=Math.min(H-1,Math.round(j*(H-1)/(N-1)));
     for(let i=0;i<N;i++){
       const sx=Math.min(W-1,Math.round(i*(W-1)/(N-1)));
-      pos.setY(j*N+i, S.heights[sy*W+sx]*vex);
+      pos.setY(j*N+i, (S.heights[sy*W+sx]-B)*vex);
     }
   }
   pos.needsUpdate=true;
@@ -309,7 +326,7 @@ uniform float uHMax;
 
 function applyColors(geo,N){
   const {W,H}=S, n=N*N, col=new Float32Array(n*3);
-  const hmax=Math.max(1,S.meta.h_p99||S.meta.h_max);
+  const B=base(), hmax=Math.max(1,(S.meta.h_p99||S.meta.h_max)-B);
   let lo=0,hi=hmax;
   if(mode==='error'){lo=-10;hi=10;}
   if(mode==='slope'){lo=0;hi=60;}
@@ -318,16 +335,16 @@ function applyColors(geo,N){
     for(let i=0;i<N;i++){
       const sx=Math.min(W-1,Math.round(i*(W-1)/(N-1)));
       const k=sy*W+sx; let rgb;
-      if(mode==='height') rgb=turbo(S.heights[k]/hmax);
+      if(mode==='height') rgb=turbo((S.heights[k]-B)/hmax);
       else if(mode==='slope') rgb=turbo(slopeAt(sx,sy)/60);
-      else { const e=S.ref?(S.heights[k]-S.ref[k]):0; rgb=diverging(e/10); }
+      else { const e=S.ref?(S.pred[k]-S.ref[k]):0; rgb=diverging(e/10); }   // always model - truth
       const o=(j*N+i)*3;
       col[o]=rgb[0]/255;col[o+1]=rgb[1]/255;col[o+2]=rgb[2]/255;
     }
   }
   geo.setAttribute('color',new THREE.BufferAttribute(col,3));
-  $('lmin').textContent=mode==='error'?'-10 m':(mode==='slope'?'0°':'0 m');
-  $('lmax').textContent=mode==='error'?'+10 m':(mode==='slope'?'60°':hmax.toFixed(0)+' m');
+  $('lmin').textContent=mode==='error'?'-10 m':(mode==='slope'?'0°':B.toFixed(0)+' m');
+  $('lmax').textContent=mode==='error'?'+10 m':(mode==='slope'?'60°':(B+hmax).toFixed(0)+' m');
   const stops=[];
   for(let s=0;s<=10;s++){const t=s/10;
     const c=mode==='error'?diverging(t*2-1):turbo(t);
@@ -370,12 +387,13 @@ async function loadScene(name){
   texMap.colorSpace=THREE.SRGBColorSpace;
   texMap.anisotropy=renderer.capabilities.getMaxAnisotropy();
 
-  S={meta,heights,ref,W:meta.width,H:meta.height,gsd:meta.gsd_m};
+  S={meta,heights,pred:heights,ref,W:meta.width,H:meta.height,gsd:meta.gsd_m};
+  surf='pred';
 
-  const isPred=meta.source==='prediction';
-  const b=$('srcbadge');
-  b.className='badge '+(isPred?'pred':'gt');
-  b.textContent=isPred?'MODEL PREDICTION':'GROUND TRUTH (no model yet)';
+  $('srcrow').style.display=ref?'grid':'none';
+  $('src-pred').classList.add('active');$('src-ref').classList.remove('active');
+  $('profile').style.display='none';
+  setBadge();
 
   $('s-ext').textContent=`${meta.extent_m[0].toFixed(0)}×${meta.extent_m[1].toFixed(0)} m`;
   $('s-gsd').textContent=meta.gsd_m+' m'+(meta.gsd_asserted?'*':'');
@@ -399,7 +417,7 @@ async function loadScene(name){
 function frameScene(){
   const EX=S.W*S.gsd;
   camera.position.set(-EX*0.60,EX*0.46,EX*0.80);
-  lookAtPoint(new THREE.Vector3(0,S.meta.h_p99*vex*0.4,0));
+  lookAtPoint(new THREE.Vector3(0,(S.meta.h_p99-base())*vex*0.4,0));
   orbit.target.set(0,0,0);orbit.update();
 }
 // point the camera AND keep fly-mode yaw/pitch consistent
@@ -499,7 +517,7 @@ function flyStep(dt){
   // terrain collision: never drop below the surface + 2 m eye height
   const [px,py]=worldToPx(camera.position.x,camera.position.z);
   if(px>=0&&py>=0&&px<S.W&&py<S.H){
-    const floor=heightAt(px,py)*vex+2;
+    const floor=(heightAt(px,py)-base())*vex+2;
     if(camera.position.y<floor)camera.position.y=floor;
   }
 }
@@ -518,7 +536,7 @@ function showProbe(px,py){
   $('p-s').textContent=slopeAt(px,py).toFixed(1)+'°';
   $('p-xy').textContent=`${px.toFixed(0)}, ${py.toFixed(0)} px`;
   if(S.ref){
-    const e2=h-S.ref[Math.round(py)*S.W+Math.round(px)];
+    const k=Math.round(py)*S.W+Math.round(px), e2=S.pred[k]-S.ref[k];
     $('p-e').textContent=(e2>=0?'+':'')+e2.toFixed(2)+' m';
   }
   return h;
@@ -535,6 +553,77 @@ $('measure').onclick=()=>{
   if(!measuring&&measureLine){scene.remove(measureLine);measureLine=null;}
   if(measuring&&flyMode)$('mode-orbit').onclick();
 };
+function setBadge(){
+  const m=S.meta, b=$('srcbadge');
+  let cls='gt', txt='GROUND TRUTH (no model yet)';
+  if(m.kind==='dsm'){cls='pred';txt='DSM = DEM + MODEL nDSM';}
+  else if(m.kind==='rdsm'){cls='pred';txt='RELATIVE DSM (no georeference)';}
+  else if(m.source==='prediction'){
+    if(surf==='ref'){cls='gt';txt='LIDAR TRUTH (reference)';}
+    else {cls='pred';txt='MODEL PREDICTION';}
+  }
+  b.className='badge '+cls; b.textContent=txt;
+}
+function setSource(which){
+  if(!S||!S.ref)return;
+  surf=which==='ref'?'ref':'pred';
+  S.heights=surf==='ref'?S.ref:S.pred;
+  $('src-pred').classList.toggle('active',surf==='pred');
+  $('src-ref').classList.toggle('active',surf==='ref');
+  setBadge(); buildMesh();
+}
+$('src-pred').onclick=()=>setSource('pred');
+$('src-ref').onclick=()=>setSource('ref');
+
+// sample both surfaces along a line (pixel coords) and chart them
+function drawProfile(ax,ay,bx,by){
+  const n=240, P=[], R=[];
+  for(let i=0;i<n;i++){
+    const t=i/(n-1), x=ax+(bx-ax)*t, y=ay+(by-ay)*t;
+    const k=Math.max(0,Math.min(S.H-1,Math.round(y)))*S.W+Math.max(0,Math.min(S.W-1,Math.round(x)));
+    P.push(S.pred[k]); if(S.ref)R.push(S.ref[k]);
+  }
+  const dist=Math.hypot(bx-ax,by-ay)*S.gsd;
+  const all=P.concat(R).filter(Number.isFinite);
+  let lo=Math.min(...all), hi=Math.max(...all);
+  if(hi-lo<1){hi+=0.5;lo-=0.5;}
+  const Wd=360,Hd=150,pad=6;
+  const X=i=>(i/(n-1))*Wd, Y=v=>Hd-pad-(v-lo)/(hi-lo)*(Hd-2*pad);
+  const line=(arr,col,w)=>'<polyline fill="none" stroke="'+col+'" stroke-width="'+w+'" '+
+    'vector-effect="non-scaling-stroke" points="'+
+    arr.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ')+'"/>';
+  let g='';
+  for(let q=0;q<=4;q++){const yy=pad+q*(Hd-2*pad)/4;
+    g+='<line x1="0" x2="'+Wd+'" y1="'+yy+'" y2="'+yy+'" stroke="#243044" stroke-width="1" vector-effect="non-scaling-stroke"/>';}
+  const isTruthScene=S.meta.source!=='prediction';
+  const cModel='#4da3ff', cRef='#ffb454';
+  let body=g;
+  if(R.length) body+=line(R,cRef,2);
+  body+=line(P,isTruthScene?cRef:cModel,2);
+  $('prof-svg').innerHTML=body+
+    '<text x="4" y="14" fill="#8b9bb4" font-size="10">'+hi.toFixed(1)+' m</text>'+
+    '<text x="4" y="'+(Hd-4)+'" fill="#8b9bb4" font-size="10">'+lo.toFixed(1)+' m</text>';
+  $('prof-d').textContent=dist.toFixed(1)+' m';
+  const sw=c=>'<i style="background:'+c+'"></i>';
+  $('prof-leg').innerHTML=R.length
+    ? '<span class="lg">'+sw(cModel)+'model</span><span class="lg">'+sw(cRef)+'LiDAR truth</span>'
+    : '<span class="lg">'+sw(isTruthScene?cRef:cModel)+(isTruthScene?'ground truth':'model')+'</span>';
+  const dH=P[n-1]-P[0];
+  let stat='peak '+Math.max(...P).toFixed(1)+' m · end-to-end change '+(dH>=0?'+':'')+dH.toFixed(1)+' m';
+  let out={dist,peak:Math.max(...P)};
+  if(R.length){
+    const e=P.map((v,i)=>v-R[i]).filter(Number.isFinite);
+    const rmse=Math.sqrt(e.reduce((a,v)=>a+v*v,0)/e.length);
+    const mx=Math.max(...e.map(Math.abs));
+    stat='along this line: RMSE '+rmse.toFixed(2)+' m · max |error| '+mx.toFixed(1)+' m · '+
+         'peak model '+Math.max(...P).toFixed(1)+' m vs truth '+Math.max(...R).toFixed(1)+' m';
+    out={...out,rmse,maxErr:mx,truthPeak:Math.max(...R)};
+  }
+  $('prof-stat').textContent=stat;
+  $('profile').style.display='block';
+  return out;
+}
+
 function doMeasure(e){
   const p=pick(e); if(!p)return;
   measurePts.push(p);
@@ -549,6 +638,7 @@ function doMeasure(e){
       new THREE.LineBasicMaterial({color:0x4da3ff}));
     scene.add(measureLine);
     toast(`Distance ${d.toFixed(1)} m   ·   Δheight ${dh>=0?'+':''}${dh.toFixed(2)} m`,5200);
+    drawProfile(ax,ay,bx,by);
     measurePts=[];
   }
 }
@@ -556,6 +646,9 @@ function doMeasure(e){
 window.DW={setMode:m=>{const b=document.querySelector(`[data-mode="${m}"]`);
   if(b&&!b.disabled)b.click();},
   frame:()=>frameScene(), get state(){return S;},
+  setSource:w=>setSource(w),
+  profile:(ax,ay,bx,by)=>drawProfile(ax,ay,bx,by),
+  scene:async n=>{$('scene').value=n;await loadScene(n);},
   setVex:v=>{vex=v;$('vex').value=v;$('vexv').textContent=v.toFixed(1)+'x';buildMesh();},
   setSun:(az,el)=>{$('saz').value=az;$('sel').value=el;updateSun();},
   orbitTo:(azDeg,elDeg,dist)=>{const a=azDeg*Math.PI/180,e=elDeg*Math.PI/180;
