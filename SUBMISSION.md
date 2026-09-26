@@ -56,7 +56,7 @@ ingest -> GSD normalisation -> tiled inference (+TTA) -> scale calibration -> DS
 - GSD normalisation: resample the input so one pixel matches the ground distance the model was trained at, then resample the output back to the original grid.
 - Tiled inference: overlapping tiles (25%) blended with Gaussian feathering. We verified numerically that the blend introduces zero seam artefacts.
 - Test-time augmentation: horizontal and vertical flips, averaged.
-- Output: DSM in a standard geospatial format (GeoTIFF), plus derived slope.
+- Output: DSM in a standard geospatial format (GeoTIFF, float32, CRS and grid of the input image, metres above the EGM2008 geoid), plus nDSM, the resampled DEM and a provenance/sanity report. Built and run end to end on a real Indian scene: Chungthang, North Sikkim (WorldView-2, 0.305 m) + Copernicus GLO-30 terrain. [[Chungthang DSM: nDSM p50/p95 __/__ m, DEM 1549-1770 m, 30 m double-count ~__ m - from out_dsm/chungthang/report.json. No LiDAR exists there, so no RMSE.]]
 
 4. MODELS
 (a) Baseline - RS3DAda (SynRS3D, MIT licence): ViT-L encoder + DPT head that outputs metres, trained on 69,667 synthetic remote-sensing images at 0.05-1 m GSD. Used zero-shot. We read its inference code rather than guessing the interface, and caught a silent trap: it expects raw 0-255 pixel values, and passing [0,1] input produces wrong heights with no error.
@@ -96,7 +96,7 @@ Three.js, runs in any modern browser:
 - Honesty built in: every scene is badged "GROUND TRUTH" or "MODEL PREDICTION".
 
 10. DATA AND LICENCES
-GAMUS (CC-BY-4.0; DC, New York, Philadelphia; aerial RGB + LiDAR nDSM + land cover). RS3DAda / SynRS3D (MIT). DINOv3 (Meta DINOv3 licence, gated). Three.js (MIT). SRTM / CartoDEM for terrain.
+GAMUS (CC-BY-4.0; DC, New York, Philadelphia; aerial RGB + LiDAR nDSM + land cover). RS3DAda / SynRS3D (MIT). DINOv3 (Meta DINOv3 licence, gated). Three.js (MIT). Terrain: Copernicus DEM GLO-30 (© DLR 2010-2014 / Airbus 2014-2018, provided under COPERNICUS by the EU and ESA); CartoDEM supported via --dem. Indian demo image: Maxar Open Data Program, WorldView-2 2022-03-07, CC BY-NC 4.0.
 
 11. RISKS AND MITIGATIONS
 - Domain gap to ISRO imagery -> satellite-pretrained encoder, GSD normalisation, a GSD robustness sweep, and DEM/GCP calibration at deployment.
@@ -105,7 +105,7 @@ GAMUS (CC-BY-4.0; DC, New York, Philadelphia; aerial RGB + LiDAR nDSM + land cov
 - Tall towers -> the training clip is 150 m, because the data holds 146 m towers and an 80 m clip would erase them.
 
 12. ROADMAP TO THE FINALE
-DEM fetch + DSM GeoTIFF export; evaluation on Indian imagery (Bhuvan/CartoDEM); a canopy-specific correction; one-click standalone packaging of the viewer; recorded flythrough demos for all four landscapes.
+Accuracy evaluation on Indian imagery against surveyed heights (the Chungthang DSM is built, but India has no open LiDAR truth, so it has sanity checks only); removing the buildings/trees that the 30 m surface DEM already contains (CartoDEM or a ground-filtered DEM); a canopy-specific correction; one-click standalone packaging of the viewer; recorded flythrough demos for all four landscapes.
 ```
 
 ---
