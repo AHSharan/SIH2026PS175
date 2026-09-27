@@ -99,6 +99,34 @@ old result, copy the zip somewhere else first.
 
 ---
 
+## Part C2 — Run OUR model (use this for the demo)
+
+Our own model is more accurate than the default one (4.69 m vs 6.74 m error on
+the US test tiles), especially on trees. It needs two extra things, once:
+
+**1. The model file.** Get `best.pt` from the 1,500-tile training run
+(Google Drive: `depthwizard_1500/ckpt/best.pt`).
+- Download it, then **don't double-click or unzip it**.
+- Rename it to **`best_1500.pt`**.
+- Put it in the `SIH2026PS175\dw_run\ckpt\` folder (create the folders if needed).
+- Check: it must be **one file** (a few MB or more), not a yellow folder.
+
+**2. A HuggingFace token** (Read type) from the account that accepted the
+DINOv3 licence. In Git Bash, in the `SIH2026PS175` folder:
+```
+export HF_TOKEN=hf_YOUR_TOKEN
+```
+Never share the token or show it in a screenshot.
+
+**Run it** (same window):
+```
+python dsm.py --model ours
+```
+It's done when you see `[saved] everything in ONE file: ...chungthang_ours_results.zip`.
+Your results go to `out_dsm\chungthang_ours\`. They don't overwrite the other runs.
+
+---
+
 ## Part D (optional) — See it in 3D
 
 ```
@@ -108,7 +136,12 @@ Open this link in Chrome: **http://localhost:8777/?assets=assets_dsm**
 
 - Drag with the mouse to look around, and click the ground to see its height
   above sea level.
-- Set *Vertical exaggeration* to 1.0× to see the true shape of the valley.
+- Pick the scene in the *Scene* list: `chungthang_ours` is our model,
+  `chungthang` the default one. The newest run opens first.
+- Scenes open at true scale (1.0×). Raise *Vertical exaggeration* only if you want
+  hills to look steeper.
+- *Above ground* in the probe panel is the model's height of the building or
+  tree you clicked.
 - When you're done, go back to PowerShell and press **Ctrl + C**.
 
 ---

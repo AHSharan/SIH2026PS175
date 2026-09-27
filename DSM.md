@@ -37,6 +37,24 @@ After the first download it's quick: 18 s end to end on an RTX 5060 laptop GPU
 
 If it says `CUDA out of memory`, run `python dsm.py --tile 518` instead.
 
+## Our model (for the demo)
+
+```bash
+python dsm.py --model ours
+```
+
+This runs our DINOv3-SAT head trained on 1,500 GAMUS tiles (RMSE 4.69 m on the
+40 held-out test tiles, vs 6.74 m for RS3DAda). It needs:
+
+- `dw_run/ckpt/best_1500.pt`: the `best.pt` from the 1,500-tile run, as ONE
+  file. A `.pt` is a zip inside, so never open or unzip it. `dsm.py` says
+  so explicitly if it finds a folder there.
+- A DINOv3 HuggingFace login: `export HF_TOKEN=hf_...` in the same terminal.
+
+Output goes to `out_dsm/chungthang_ours/` and the viewer scene `chungthang_ours`,
+so it never overwrites the RS3DAda run. Plain `python dsm.py` still runs
+RS3DAda, which needs no login.
+
 ## Where the results are saved
 
 - `out_dsm/chungthang_results.zip`: **everything in one file** (the GeoTIFFs,
@@ -54,7 +72,10 @@ python serve.py
 
 Then open http://localhost:8777/?assets=assets_dsm. The badge reads
 **DSM = DEM + MODEL nDSM**. Clicking the terrain shows real elevation in metres.
-Set *Vertical exaggeration* to 1.0× to see the true valley shape.
+DSM scenes open at true scale (1.0×). The probe also shows *Above ground*,
+the model's height of the clicked building or tree. Building walls are
+detected from that height above ground, not from the terrain slope, so steep
+hillsides keep their real image colours instead of being painted as walls.
 
 ---
 
@@ -112,10 +133,12 @@ automatically. To use CartoDEM or any other DEM instead:
 
 ## Tested here (no GPU)
 
-`python tests/test_dsm_cpu.py` → **29/29 pass**. It checks CRS/transform
+`python tests/test_dsm_cpu.py` → **36/36 pass**. It checks CRS/transform
 preservation, DSM = DEM + nDSM exactly, reprojection from a DEM in a different
 CRS (exact to 0.01 m), degree→metre GSD, scene-fill masking, window crops,
-the PNG path, GLO-30 tile naming, the summary file and the results zip, and the Chungthang sample end to end. The
+the PNG path, GLO-30 tile naming, the summary file and the results zip,
+the viewer's above-ground layer and 1.0× default, the `--model ours` preset and
+its error messages, and the Chungthang sample end to end. The
 whole pipeline also ran on the sample with a fake model, and the viewer
 rendered the scene. What we could **not** run here is the real RS3DAda model on
 this image: this cloud machine has no GPU and can't reach HuggingFace. That's
