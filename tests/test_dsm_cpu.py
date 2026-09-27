@@ -188,6 +188,33 @@ def main():
         check("unzipped best.pt folder -> clear message",
               r.returncode != 0 and "is a FOLDER" in (r.stdout + r.stderr))
 
+        # ---- 4c. building finder: known roofs found, tall dark-green canopy rejected
+        Hb = Wb = 400
+        rgb_b = np.full((Hb, Wb, 3), 120, np.float32)
+        nd = np.zeros((Hb, Wb), np.float32)
+        for y, x, h, w, z in [(50, 50, 20, 20, 6.2), (200, 100, 30, 15, 9.1), (300, 300, 12, 12, 3.4)]:
+            nd[y:y + h, x:x + w] = z
+            rgb_b[y:y + h, x:x + w] = (170, 60, 50)
+        rng2 = np.random.default_rng(1)
+        rgb_b[100:160, 250:310] = np.clip(np.array([50, 95, 45]) + rng2.normal(0, 30, (60, 60, 1)), 0, 255)
+        nd[100:160, 250:310] = 12.0
+        gr = np.full((Hb, Wb), 1600, np.float32)
+        ids_b, bl = M.find_buildings(nd, gr, rgb_b, 0.61)
+        check("buildings: 3 roofs found, canopy rejected",
+              len(bl) == 3 and not ids_b[100:160, 250:310].any(), f"{len(bl)} found")
+        check("buildings: area/height/floors exact",
+              [(b["area_m2"], b["height_m"], b["floors"]) for b in bl]
+              == [(148.8, 6.2, 2), (167.4, 9.1, 3), (53.6, 3.4, 1)])
+        bj = json.load(open(os.path.join(exp, "syn_bld.json")))
+        check("viewer writes building files",
+              meta.get("has_buildings") and "buildings" in bj
+              and os.path.getsize(os.path.join(exp, "syn_bldid.bin")) == hb.size * 2)
+        r_nb = M.run(img, os.path.join(tmp, "o_nb"), fn=const_backend(7.5), dem=[dem_p],
+                     export=os.path.join(tmp, "v_nb"), name="nb", tta=False,
+                     backend="const", buildings=False)
+        check("--no-buildings skips the finder",
+              "buildings" not in r_nb and not os.path.exists(os.path.join(tmp, "v_nb", "nb_bld.json")))
+
         # ---- 5. GLO-30 tile naming
         u = M.glo30_tiles((88.58, 27.55, 88.69, 27.65))
         check("GLO-30 tile name", len(u) == 1 and u[0].endswith(

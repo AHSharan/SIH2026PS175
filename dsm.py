@@ -269,8 +269,75 @@ def sanity(ndsm, dem, dsm, valid, gsd):
     return r
 
 
+# --------------------------------------------------------------------------
+# candidate buildings (optional, for the viewer's flood/building tools)
+# --------------------------------------------------------------------------
+BLD_HMIN = 2.5          # m above ground to count as a structure
+BLD_MIN_AREA = 20.0     # m^2 (a small house)
+BLD_MAX_AREA = 5000.0   # m^2 (bigger blobs are merged neighbourhoods/fields)
+FLOOR_H = 3.0           # m per storey, a common rule of thumb
+
+
+def _greenness(rgb):
+    r, g, b = (rgb[..., i].astype(np.float32) for i in range(3))
+    s = r + g + b + 1e-3
+    return (2 * g - r - b) / s, s / 3          # excess-green index, brightness
+
+
+def vegetation_mask(rgb):
+    """Green AND rough = tree canopy. Checked on the Chungthang image: forest is
+    caught; painted green roofs are smooth, so only their thin outlines are
+    flagged, and the opening below removes those."""
+    from scipy.ndimage import uniform_filter, binary_opening
+    exg, lum = _greenness(rgb)
+    tex = np.sqrt(np.maximum(uniform_filter(lum ** 2, 7) - uniform_filter(lum, 7) ** 2, 0))
+    return binary_opening((exg > 0.04) & (tex > 9), np.ones((3, 3), bool))
+
+
+def find_buildings(ndsm, ground, rgb, gsd):
+    """Heuristic building candidates from the model's height above ground.
+
+    ndsm, ground: (H,W) metres on the same grid; rgb (H,W,3) 0-255; gsd m/px.
+    Returns (ids uint16 (H,W), list of dicts). A candidate is a connected patch
+    of pixels >= BLD_HMIN m that are not tree canopy. Height = 90th percentile
+    of the patch; floors = height / FLOOR_H. These are ESTIMATES: neighbouring
+    roofs can merge and the model's heights carry its few-metre error."""
+    from scipy.ndimage import binary_opening, label, find_objects
+    tall = np.isfinite(ndsm) & (ndsm >= BLD_HMIN) & ~vegetation_mask(rgb)
+    tall = binary_opening(tall, np.ones((2, 2), bool))
+    lab, n = label(tall)
+    exg, lum = _greenness(rgb)
+    px_area = gsd * gsd
+    ids = np.zeros(ndsm.shape, np.uint16)
+    out = []
+    for k, sl in enumerate(find_objects(lab), start=1):
+        if sl is None:
+            continue
+        m = lab[sl] == k
+        area = float(m.sum() * px_area)
+        if not (BLD_MIN_AREA <= area <= BLD_MAX_AREA) or len(out) >= 65000:
+            continue
+        # shadowed canopy is dark green and slips past the texture test;
+        # painted green roofs are bright (measured on Chungthang: canopy
+        # brightness 48-76, green roof 127)
+        if np.median(exg[sl][m]) > 0.05 and np.median(lum[sl][m]) < 90:
+            continue
+        h = float(np.percentile(ndsm[sl][m], 90))
+        gr = ground[sl][m]
+        yy, xx = np.nonzero(m)
+        bid = len(out) + 1
+        ids[sl][m] = bid
+        out.append({"id": bid, "x": round(float(xx.mean() + sl[1].start), 1),
+                    "y": round(float(yy.mean() + sl[0].start), 1),
+                    "area_m2": round(area, 1), "height_m": round(h, 2),
+                    "floors": max(1, int(round(h / FLOOR_H))),
+                    "ground_min_m": round(float(np.nanmin(gr)), 2),
+                    "ground_mean_m": round(float(np.nanmean(gr)), 2)})
+    return ids, out
+
+
 def export_viewer(out_dir, name, rgb, surf, gsd, kind, meta_extra, max_px=1024,
-                  ndsm=None):
+                  ndsm=None, buildings=True):
     """Viewer assets. Heights are downsampled to <= max_px per side (mesh is
     1024 verts anyway); the texture keeps up to 2048 px for sharpness.
 
@@ -300,6 +367,24 @@ def export_viewer(out_dir, name, rgb, surf, gsd, kind, meta_extra, max_px=1024,
                            (h2, w2), order=1)
         ns.astype(np.float32).tofile(os.path.join(out_dir, f"{name}_ndsm.bin"))
         extra = {"has_ndsm": True, "ndsm_p99": float(np.percentile(ns, 99))}
+        if buildings:
+            from PIL import Image as _I
+            rgb_v = np.asarray(_I.fromarray(np.clip(rgb, 0, 255).astype(np.uint8))
+                               .resize((w2, h2), _I.BILINEAR))
+            ids, blds = find_buildings(ns, hs - ns, rgb_v, g2)
+            ids.tofile(os.path.join(out_dir, f"{name}_bldid.bin"))
+            floors = [b["floors"] for b in blds]
+            info = {"count": len(blds),
+                    "floors_hist": {str(f): floors.count(f) for f in sorted(set(floors))},
+                    "params": {"min_height_m": BLD_HMIN, "min_area_m2": BLD_MIN_AREA,
+                               "max_area_m2": BLD_MAX_AREA, "floor_height_m": FLOOR_H},
+                    "note": ("Heuristic candidates from the model's height above "
+                             "ground, trees removed by colour+texture. Floors = "
+                             "height / 3 m. Estimates, not surveyed data.")}
+            with open(os.path.join(out_dir, f"{name}_bld.json"), "w", encoding="utf-8") as f:
+                json.dump({**info, "buildings": blds}, f)
+            extra.update(has_buildings=True, buildings=info)
+            print(f"[viewer] {len(blds)} candidate buildings (heuristic)")
     meta = {"name": name, "width": int(w2), "height": int(h2),
             "gsd_m": round(float(g2), 4), "gsd_asserted": False,
             "extent_m": [float(w2 * g2), float(h2 * g2)],
@@ -401,7 +486,7 @@ def get_backend(name, ckpt=None, synrs3d_dir="SynRS3D", head=None):
 def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
         model_gsd=None, tta=True, tile=None,
         dem=None, export=None, name=None, ckpt=None, synrs3d_dir="SynRS3D",
-        source_note=None, head=None, label=None):
+        source_note=None, head=None, label=None, buildings=True):
     cfg = BACKENDS.get(backend, BACKENDS["rs3dada"])
     model_gsd = model_gsd or cfg["model_gsd"]
     tile = tile or cfg["tile"]
@@ -492,7 +577,10 @@ def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
             extra.update(dem_credit=report["dem_credit"], caveat=report["caveat"],
                          vertical_datum=report["vertical_datum"])
         report["viewer"] = export_viewer(export, name, rgb, surf, in_gsd, kind, extra,
-                                         ndsm=ndsm if kind == "dsm" else None)
+                                         ndsm=ndsm if kind == "dsm" else None,
+                                         buildings=buildings)
+        if report["viewer"].get("buildings"):
+            report["buildings"] = report["viewer"]["buildings"]
 
     report["seconds"] = round(time.time() - t0, 1)
     with open(os.path.join(out, "report.json"), "w", encoding="utf-8") as f:
@@ -533,6 +621,12 @@ def write_summary(out, r):
               f"  DEM double-count estimate: ~{s.get('double_count_30m_mean_m')} m on average "
               f"({s.get('double_count_30m_p95_m')} m in the busiest 5 %)",
               f"  terrain source: {r.get('dem_credit')}"]
+    if r.get("buildings"):
+        bi = r["buildings"]
+        fh = ", ".join(f"{k} floor{'s' if k != '1' else ''}: {v}" for k, v in bi["floors_hist"].items())
+        L += ["", f"Candidate buildings (heuristic, for the viewer tools): {bi['count']}",
+              f"  estimated floors ({bi['params']['floor_height_m']:.0f} m each) - {fh}",
+              "  these are estimates from predicted heights, not surveyed data"]
     L += ["", s["note"], f"Run time: {r['seconds']} s"]
     with open(os.path.join(out, "SUMMARY.txt"), "w", encoding="utf-8") as f:
         f.write("\n".join(L) + "\n")
@@ -642,6 +736,8 @@ def main():
                     help="viewer asset folder ('' to skip)")
     ap.add_argument("--name", default=None)
     ap.add_argument("--credit", default=None, help="image credit written into outputs")
+    ap.add_argument("--no-buildings", action="store_true",
+                    help="skip the heuristic building finder (viewer tools)")
     ap.add_argument("--no-zip", action="store_true",
                     help="don't pack the results into <out>_results.zip")
     ap.add_argument("--fetch-sample", action="store_true",
@@ -667,7 +763,8 @@ def main():
     rep = run(image, out, backend=a.backend, window=window, gsd=a.gsd,
               model_gsd=a.model_gsd, tta=not a.no_tta, tile=a.tile, dem=dem,
               export=a.export or None, name=name, ckpt=a.ckpt,
-              synrs3d_dir=a.synrs3d_dir, source_note=credit, head=a.head, label=label)
+              synrs3d_dir=a.synrs3d_dir, source_note=credit, head=a.head, label=label,
+              buildings=not a.no_buildings)
     print(f"[saved] plain-English numbers: {os.path.abspath(os.path.join(out, 'SUMMARY.txt'))}")
     if not a.no_zip:
         zip_results(out.rstrip("/\\") + "_results.zip", out, a.export,
