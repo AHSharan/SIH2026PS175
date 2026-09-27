@@ -142,6 +142,17 @@ Open this link in Chrome: **http://localhost:8777/?assets=assets_dsm**
   hills to look steeper.
 - *Above ground* in the probe panel is the model's height of the building or
   tree you clicked.
+
+**Optional tools** (bottom right, all off until you click them):
+- **Flood**: drag *Water level* to raise water through the valley. It shows the
+  flooded area and how many buildings the water reaches. This is a simple
+  "bathtub" screening, not a river-flow simulation.
+- **Buildings**: pins on candidate buildings, coloured by estimated floors
+  (green 1 → red 5+). With Flood on, pins turn **red** when the water reaches
+  them. Switch to *Orbit* and click a roof to see its height and floors.
+- **Tour → Play tour**: a 24-second automatic flight. **Record video** does the
+  same flight and saves a video file to your Downloads folder (use Chrome, and
+  keep the tab visible while it records). Press **Esc** to stop early.
 - When you're done, go back to PowerShell and press **Ctrl + C**.
 
 ---

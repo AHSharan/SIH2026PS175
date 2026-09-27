@@ -55,6 +55,19 @@ Output goes to `out_dsm/chungthang_ours/` and the viewer scene `chungthang_ours`
 so it never overwrites the RS3DAda run. Plain `python dsm.py` still runs
 RS3DAda, which needs no login.
 
+## Optional viewer tools (for the demo)
+
+All three are off until clicked, in the *Tools (optional)* panel:
+
+| tool | what it does | honest limit |
+|---|---|---|
+| **Flood** | water rises from the lowest ground (the river) as you drag the level; shows flooded area and buildings reached | "bathtub" screening: everything below the level is wet, with no river flow and no connectivity; heights carry the model's few-metre error |
+| **Buildings** | pins on candidate buildings with estimated floors; click a roof for details | heuristic: model height ≥ 2.5 m, trees removed by colour + texture, floors = height ÷ 3 m; neighbouring roofs can merge or split |
+| **Tour** | 24 s scripted fly-through; *Record video* saves MP4 (or WebM) of the 3D view | needs Chrome with a GPU; checked here only with a slow software renderer |
+
+The buildings come from `dsm.py` (`<scene>_bld.json`, `<scene>_bldid.bin`, and a
+count in `SUMMARY.txt`). Skip them with `--no-buildings`.
+
 ## Where the results are saved
 
 - `out_dsm/chungthang_results.zip`: **everything in one file** (the GeoTIFFs,
@@ -133,12 +146,12 @@ automatically. To use CartoDEM or any other DEM instead:
 
 ## Tested here (no GPU)
 
-`python tests/test_dsm_cpu.py` → **36/36 pass**. It checks CRS/transform
+`python tests/test_dsm_cpu.py` → **40/40 pass**. It checks CRS/transform
 preservation, DSM = DEM + nDSM exactly, reprojection from a DEM in a different
 CRS (exact to 0.01 m), degree→metre GSD, scene-fill masking, window crops,
 the PNG path, GLO-30 tile naming, the summary file and the results zip,
 the viewer's above-ground layer and 1.0× default, the `--model ours` preset and
-its error messages, and the Chungthang sample end to end. The
+its error messages, the building finder (known roofs found, dark-green canopy rejected), and the Chungthang sample end to end. The
 whole pipeline also ran on the sample with a fake model, and the viewer
 rendered the scene. What we could **not** run here is the real RS3DAda model on
 this image: this cloud machine has no GPU and can't reach HuggingFace. That's
