@@ -17,7 +17,12 @@
     border-radius:10px;backdrop-filter:blur(12px);padding:12px 13px;
     box-shadow:0 8px 32px #0009}
   #left{top:14px;left:14px;width:232px}
-  #right{top:14px;right:14px;width:212px}
+  #rcol{position:absolute;top:14px;right:14px;width:212px;display:flex;
+    flex-direction:column;gap:10px;max-height:calc(100% - 28px);overflow-y:auto}
+  #rcol .panel{position:static}
+  #tools .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+  #tools .note{color:var(--dim);font-size:10.5px;margin-top:5px;line-height:1.35}
+  #tools button:disabled{opacity:.4;cursor:not-allowed}
   #bottom{bottom:14px;left:50%;transform:translateX(-50%);
     display:flex;gap:16px;align-items:center;padding:9px 16px}
   h1{margin:0 0 2px;font-size:15px;letter-spacing:.2px}
@@ -112,6 +117,7 @@
   <button id="measure" style="margin-top:6px">Measure distance</button>
 </div>
 
+<div id="rcol">
 <div class="panel" id="right">
   <h2>Probe</h2>
   <div class="kv"><span id="p-hl">Height</span><b id="p-h">—</b></div>
@@ -119,6 +125,7 @@
     <span>Above ground</span><b id="p-ag">—</b></div>
   <div class="kv"><span>Slope</span><b id="p-s">—</b></div>
   <div class="kv"><span>X / Y</span><b id="p-xy">—</b></div>
+  <div class="kv" id="p-b-row" style="display:none"><span>Building</span><b id="p-b">—</b></div>
   <div class="kv" id="p-err-row" style="display:none">
     <span>Error</span><b id="p-e">—</b></div>
 
@@ -138,6 +145,42 @@
   <div class="kv"><span>FPS</span><b id="fps">—</b></div>
   <div class="kv"><span>Vertices</span><b id="verts">—</b></div>
   <div class="kv"><span>Eye alt.</span><b id="alt">—</b></div>
+</div>
+
+<div class="panel" id="tools">
+  <h2 style="margin-top:0">Tools <span style="text-transform:none;letter-spacing:0">(optional)</span></h2>
+  <div class="row3">
+    <button id="t-flood" title="Raise a water level through the valley (DSM scenes)">Flood</button>
+    <button id="t-bld" title="Show candidate buildings with estimated floors (DSM scenes)">Buildings</button>
+    <button id="t-tour" title="Automatic fly-through; can record a video">Tour</button>
+  </div>
+  <div id="flood-ui" style="display:none">
+    <h2>Water level <span class="val" id="fl-v">+0.0 m</span></h2>
+    <input type="range" id="fl" min="0" max="40" step="0.5" value="0">
+    <div class="kv"><span>Water elevation</span><b id="fl-el">—</b></div>
+    <div class="kv"><span>Flooded area</span><b id="fl-a">—</b></div>
+    <div class="kv" id="fl-b-row"><span>Buildings reached</span><b id="fl-b">—</b></div>
+    <div class="kv" id="fl-d-row"><span>… water &gt; 1 m deep</span><b id="fl-d">—</b></div>
+    <div class="note">Level above the lowest ground in view (the river). Simple "bathtub"
+      screening: everything below the level is wet; no river flow. Heights carry
+      the model's few-metre error.</div>
+  </div>
+  <div id="bld-ui" style="display:none">
+    <div class="kv" style="margin-top:6px"><span>Candidate buildings</span><b id="b-n">—</b></div>
+    <div id="b-hist" class="note"></div>
+    <div class="note">Found from the model's height above ground, trees removed by
+      colour + texture. Floors ≈ height ÷ 3 m. Estimates, not survey data.
+      Click a roof in Orbit mode for its details.</div>
+  </div>
+  <div id="tour-ui" style="display:none">
+    <div class="row">
+      <button id="tour-play">Play tour</button>
+      <button id="tour-rec">Record video</button>
+    </div>
+    <div class="note" id="tour-st">A 24 s flight over the scene. Recording saves a
+      video of the 3D view only (no panels).</div>
+  </div>
+</div>
 </div>
 
 <div class="panel" id="bottom">
@@ -281,6 +324,8 @@ function buildMesh(){
   ground.position.y=-0.35; ground.receiveShadow=true;
   scene.add(ground);
   $('verts').textContent=(N*N/1000).toFixed(0)+'k';
+  if(T.flood)updateFlood();
+  if(T.bld)placePins();
 }
 
 // A heightmap is one continuous surface, so a building edge becomes a single
@@ -420,11 +465,19 @@ async function loadScene(name){
         if(hag.length!==heights.length)hag=null;}
     catch(e){hag=null;}
   }
+  let blds=null, bldId=null;
+  if(meta.has_buildings&&hag){
+    try{blds=await (await fetch(`${ASSETS}/${name}_bld.json`)).json();
+        bldId=new Uint16Array(await (await fetch(`${ASSETS}/${name}_bldid.bin`)).arrayBuffer());
+        if(bldId.length!==heights.length){blds=null;bldId=null;}}
+    catch(e){blds=null;bldId=null;}
+  }
   texMap=await new THREE.TextureLoader().loadAsync(`${ASSETS}/${name}_tex.jpg`);
   texMap.colorSpace=THREE.SRGBColorSpace;
   texMap.anisotropy=renderer.capabilities.getMaxAnisotropy();
 
-  S={meta,heights,pred:heights,ref,hag,W:meta.width,H:meta.height,gsd:meta.gsd_m};
+  if(typeof T!=='undefined')resetTools();
+  S={meta,heights,pred:heights,ref,hag,blds,bldId,W:meta.width,H:meta.height,gsd:meta.gsd_m};
   // each scene opens at its own sensible scale (DSM 1.0x, GAMUS tiles 2.0x)
   vex=meta.vex_default||2.0;$('vex').value=vex;$('vexv').textContent=vex.toFixed(1)+'×';
   $('p-ag-row').style.display=hag?'flex':'none';
@@ -451,6 +504,7 @@ async function loadScene(name){
     $('v-bias').textContent=(meta.metrics.bias_m>=0?'+':'')+meta.metrics.bias_m.toFixed(2)+' m';
   } else $('valblock').style.display='none';
 
+  toolsAvailable();
   buildMesh();
   frameScene();
   $('loading').style.display='none';
@@ -579,6 +633,9 @@ function showProbe(px,py){
                     Math.max(0,Math.min(S.W-1,Math.round(px)));
     $('p-ag').textContent=S.hag[k].toFixed(2)+' m';}
   $('p-s').textContent=slopeAt(px,py).toFixed(1)+'°';
+  const bb=S.blds?buildingAt(px,py):null;
+  $('p-b-row').style.display=bb?'flex':'none';
+  if(bb)$('p-b').textContent=`#${bb.id} · ≈${bb.floors} fl · ${bb.height_m.toFixed(1)} m`;
   $('p-xy').textContent=`${px.toFixed(0)}, ${py.toFixed(0)} px`;
   if(S.ref){
     const k=Math.round(py)*S.W+Math.round(px), e2=S.pred[k]-S.ref[k];
@@ -688,6 +745,198 @@ function doMeasure(e){
   }
 }
 
+
+/* ------------------------------------------------ optional tools
+   All three are OFF until their button is pressed.
+   Flood: water plane at (lowest ground + level); counts use ground = DSM - nDSM.
+   Buildings: candidates exported by dsm.py (<scene>_bld.json + _bldid.bin).
+   Tour: scripted 24 s camera flight; can record the canvas to a video file. */
+const T={flood:false,bld:false,tour:null,level:0,water:null,pins:null,rec:null};
+const groundAt=k=>S.heights[k]-S.hag[k];
+function toolsAvailable(){
+  const dsm=!!(S&&S.hag);
+  $('t-flood').disabled=!dsm; $('t-bld').disabled=!(S&&S.blds);
+  if(!dsm&&T.flood)setFlood(false);
+  if(!(S&&S.blds)&&T.bld)setBld(false);
+}
+function resetTools(){ setFlood(false); setBld(false); stopTour(); toolsAvailable(); }
+
+// ---- flood
+function gMin(){ if(S._gmin===undefined){let m=Infinity;
+  for(let k=0;k<S.heights.length;k++){const g=groundAt(k); if(g<m)m=g;} S._gmin=m;}
+  return S._gmin; }
+function waterElev(){ return gMin()+T.level; }
+function setFlood(on){
+  T.flood=on; $('t-flood').classList.toggle('active',on);
+  $('flood-ui').style.display=on?'block':'none';
+  if(!on&&T.water){scene.remove(T.water);T.water.geometry.dispose();T.water.material.dispose();T.water=null;}
+  if(on){ // slider covers the valley: lowest ground -> 95th pct ground (cap 150 m)
+    const g=[]; for(let k=0;k<S.heights.length;k+=37)g.push(groundAt(k));
+    g.sort((a,b)=>a-b);
+    const top=Math.min(150,Math.max(10,Math.ceil(g[Math.floor(g.length*0.95)]-gMin())));
+    $('fl').max=top; if(T.level>top){T.level=top;$('fl').value=top;}
+    updateFlood();
+  }
+  if(T.bld)colorPins();
+}
+function floodStats(){
+  const L=waterElev(); let n=0;
+  for(let k=0;k<S.heights.length;k++) if(groundAt(k)<L)n++;
+  const out={level:T.level,elev:L,area_m2:n*S.gsd*S.gsd,frac:n/S.heights.length};
+  if(S.blds){ let r=0,d=0; for(const b of S.blds.buildings){
+      const dep=L-b.ground_min_m; if(dep>0)r++; if(dep>1)d++; }
+    out.reached=r; out.deep=d; }
+  return out;
+}
+function updateFlood(){
+  if(!T.flood||!S)return;
+  const {W,H,gsd}=S, EX=W*gsd, EY=H*gsd, st=floodStats();
+  if(!T.water){
+    const g=new THREE.PlaneGeometry(EX,EY); g.rotateX(-Math.PI/2);
+    // alpha mask: water is drawn only over ground that is below the level, so
+    // it never shows as a sheet sticking out under hillsides at the tile edge
+    const tex=new THREE.DataTexture(new Uint8Array(W*H*4),W,H);
+    tex.magFilter=tex.minFilter=THREE.LinearFilter;
+    T.water=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x2d86e0,
+      transparent:true,opacity:0.62,roughness:0.15,metalness:0.1,depthWrite:false,
+      alphaMap:tex,alphaTest:0.35}));
+    T.water.renderOrder=2; scene.add(T.water);
+  }
+  { // refresh the mask: DataTexture row 0 is the SOUTH edge, image row 0 is north
+    const d=T.water.material.alphaMap.image.data, L=st.elev;
+    for(let y=0;y<H;y++){const src=(H-1-y)*W, dst=y*W;
+      for(let x=0;x<W;x++){const v=groundAt(src+x)<L?255:0, o=(dst+x)*4;
+        d[o]=d[o+1]=d[o+2]=v; d[o+3]=255;}}
+    T.water.material.alphaMap.needsUpdate=true;
+  }
+  T.water.position.y=(st.elev-base())*vex;
+  $('fl-v').textContent='+'+T.level.toFixed(1)+' m';
+  $('fl-el').textContent=st.elev.toFixed(1)+' m';
+  $('fl-a').textContent=(st.area_m2>=1e4?(st.area_m2/1e4).toFixed(2)+' ha':st.area_m2.toFixed(0)+' m²')+
+    ' ('+(st.frac*100).toFixed(0)+'%)';
+  $('fl-b-row').style.display=$('fl-d-row').style.display=S.blds?'flex':'none';
+  if(S.blds){$('fl-b').textContent=st.reached+' / '+S.blds.count;$('fl-d').textContent=st.deep;}
+  if(T.bld)colorPins();
+  return st;
+}
+$('t-flood').onclick=()=>{ if(!$('t-flood').disabled)setFlood(!T.flood); };
+$('fl').oninput=e=>{T.level=+e.target.value;updateFlood();};
+
+// ---- buildings
+const FLOOR_COL=[0x3ddc97,0x9be15d,0xf5d547,0xffa24c,0xff5d4a];
+function setBld(on){
+  T.bld=on; $('t-bld').classList.toggle('active',on);
+  $('bld-ui').style.display=on?'block':'none';
+  if(T.pins){scene.remove(T.pins);T.pins.geometry.dispose();T.pins.material.dispose();T.pins=null;}
+  if(on&&S&&S.blds){
+    const B=S.blds;
+    $('b-n').textContent=B.count;
+    $('b-hist').textContent='Estimated floors - '+Object.entries(B.floors_hist)
+      .map(([f,c])=>f+': '+c).join(' · ');
+    placePins();
+  }
+}
+function placePins(){
+  if(!T.bld||!S||!S.blds)return;
+  if(T.pins){scene.remove(T.pins);T.pins.geometry.dispose();T.pins.material.dispose();}
+  const L=S.blds.buildings, EX=S.W*S.gsd, EY=S.H*S.gsd;
+  const r=Math.max(2,EX/170);                       // ~3.7 m on a 625 m scene
+  const g=new THREE.ConeGeometry(r,r*2.8,12); g.rotateX(Math.PI);   // points down at the roof
+  T.pins=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({roughness:0.45,
+    emissive:0x222222}),L.length);
+  const m=new THREE.Matrix4();
+  L.forEach((b,i)=>{
+    const roof=b.ground_mean_m+b.height_m;
+    m.makeTranslation((b.x+0.5)*S.gsd-EX/2,(roof-base())*vex+r*1.6,(b.y+0.5)*S.gsd-EY/2);
+    T.pins.setMatrixAt(i,m);
+  });
+  T.pins.instanceMatrix.needsUpdate=true; scene.add(T.pins); colorPins();
+}
+function colorPins(){
+  if(!T.pins)return;
+  const c=new THREE.Color(), L=S.blds.buildings, wl=T.flood?waterElev():-Infinity;
+  L.forEach((b,i)=>{
+    if(T.flood) c.setHex(wl-b.ground_min_m>0?0xff3b3b:0xe8eef7);
+    else c.setHex(FLOOR_COL[Math.min(4,b.floors-1)]);
+    T.pins.setColorAt(i,c);
+  });
+  T.pins.instanceColor.needsUpdate=true;
+}
+$('t-bld').onclick=()=>{ if(!$('t-bld').disabled)setBld(!T.bld); };
+function buildingAt(px,py){
+  if(!S.bldId)return null;
+  const k=Math.max(0,Math.min(S.H-1,Math.round(py)))*S.W+Math.max(0,Math.min(S.W-1,Math.round(px)));
+  const id=S.bldId[k]; return id?S.blds.buildings[id-1]:null;
+}
+
+// ---- tour (+ recording)
+function setTourUI(on){ $('t-tour').classList.toggle('active',on);
+  $('tour-ui').style.display=on?'block':'none'; }
+$('t-tour').onclick=()=>{ const on=$('tour-ui').style.display==='none';
+  if(!on)stopTour(); setTourUI(on); };
+function tourPose(u){
+  // one smooth pass: high and wide -> low over the middle, ~290 degrees round
+  const EX=S.W*S.gsd, e=u*u*(3-2*u);
+  const ang=2.3+e*Math.PI*1.6, r=EX*(0.95-0.52*e);
+  const mid=(S.meta.h_p99+S.meta.h_min)/2;
+  const tgt=new THREE.Vector3(0,(mid-base())*vex*0.5,0);
+  const pos=new THREE.Vector3(r*Math.sin(ang),EX*(0.55-0.36*e)+tgt.y,r*Math.cos(ang));
+  const [px,py]=worldToPx(pos.x,pos.z);
+  if(px>=0&&py>=0&&px<S.W&&py<S.H)pos.y=Math.max(pos.y,(heightAt(px,py)-base())*vex+25);
+  return {pos,tgt};
+}
+function applyTour(u){ const {pos,tgt}=tourPose(u); camera.position.copy(pos); lookAtPoint(tgt); }
+function startTour(record){
+  if(!S)return; stopTour();
+  document.exitPointerLock?.();
+  T.tour={t0:performance.now(),dur:24000,wasOrbit:orbit.enabled}; orbit.enabled=false;
+  $('tour-play').textContent='Stop';
+  if(record){
+    const types=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'];
+    const type=types.find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t));
+    if(!type){toast('This browser cannot record video - try Chrome');}
+    else{
+      // record a 2D copy of each rendered frame: capturing the WebGL canvas
+      // directly produced empty files in testing, a 2D canvas records reliably
+      const gl=renderer.domElement, cv=document.createElement('canvas');
+      cv.width=gl.width; cv.height=gl.height; T.mirror={cv,ctx:cv.getContext('2d')};
+      // must be in the page to produce frames; 1 CSS px and transparent, so unseen
+      cv.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0.01;pointer-events:none';
+      document.body.appendChild(cv);
+      const chunks=[], rec=new MediaRecorder(cv.captureStream(30),
+        {mimeType:type,videoBitsPerSecond:12e6});
+      rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+      rec.onstop=()=>{
+        cv.remove(); T.mirror=null;
+        const blob=new Blob(chunks,{type}), ext=type.startsWith('video/mp4')?'mp4':'webm';
+        T.lastVideo={size:blob.size,type};
+        if(!blob.size){$('tour-st').textContent='Recording failed (empty video) - '+
+          'use Chrome, keep the tab visible, or screen-record instead.';return;}
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+        a.download=`depthwizard_${S.meta.name}_tour.${ext}`; document.body.appendChild(a); a.click();
+        setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);
+        $('tour-st').textContent=`Saved ${a.download} (${(blob.size/1e6).toFixed(1)} MB) to Downloads.`;
+      };
+      rec.start(1000); T.rec=rec; $('tour-rec').classList.add('active');
+      $('tour-st').textContent='Recording… keep this tab visible.';
+    }
+  }
+}
+function stopTour(){
+  if(!T.tour)return;
+  orbit.enabled=T.tour.wasOrbit; T.tour=null; $('tour-play').textContent='Play tour';
+  $('tour-rec').classList.remove('active');
+  if(T.rec){const r=T.rec;T.rec=null; if(r.state!=='inactive')r.stop();}
+}
+function tourStep(now){
+  const u=Math.min(1,(now-T.tour.t0)/T.tour.dur);
+  applyTour(u);
+  if(u>=1)stopTour();
+}
+$('tour-play').onclick=()=>{ if(T.tour)stopTour(); else startTour(false); };
+$('tour-rec').onclick=()=>{ if(T.tour)stopTour(); else startTour(true); };
+addEventListener('keydown',e=>{ if(e.code==='Escape'&&T.tour)stopTour(); });
+
 window.DW={setMode:m=>{const b=document.querySelector(`[data-mode="${m}"]`);
   if(b&&!b.disabled)b.click();},
   frame:()=>frameScene(), get state(){return S;},
@@ -701,6 +950,12 @@ window.DW={setMode:m=>{const b=document.querySelector(`[data-mode="${m}"]`);
                         dist*Math.cos(e)*Math.cos(a));
     lookAtPoint(new THREE.Vector3(0,(S.meta.h_p99-base())*vex*0.35,0));},
   probeAt:(px,py)=>showProbe(px,py),
+  flood:(on,level)=>{if(level!==undefined){T.level=level;$('fl').value=level;}
+    setFlood(on);return on?floodStats():null;},
+  buildings:on=>{setBld(on);return S.blds?S.blds.count:null;},
+  tourFrame:u=>{applyTour(u);},
+  tour:rec=>{setTourUI(true);startTour(!!rec);},
+  get tools(){return {flood:T.flood,bld:T.bld,tour:!!T.tour,lastVideo:T.lastVideo||null};},
   // test hook: share of the mesh shaded as facade, overall and where the
   // above-ground height is under / over 2 m (read-only)
   wallStats:()=>{const w=mesh.geometry.attributes.wallness, h=mesh.geometry.attributes.hag;
@@ -722,13 +977,14 @@ function tick(){
   fpsAcc+=1/Math.max(dt,1e-4); fpsN++;
   if(fpsN>=20){$('fps').textContent=(fpsAcc/fpsN).toFixed(0);fpsAcc=fpsN=0;}
   if(S){
-    flyStep(dt);
-    if(orbit.enabled)orbit.update();
+    if(T.tour) tourStep(now);
+    else { flyStep(dt); if(orbit.enabled)orbit.update(); }
     $('alt').textContent=camera.position.y.toFixed(0)+' m';
     const m=Math.round(110*(2*camera.position.y*Math.tan(camera.fov*Math.PI/360))/innerHeight);
     $('sbtxt').textContent=m>0?`${m} m`:'—';
     $('needle').setAttribute('transform',`rotate(${-yaw*180/Math.PI} 22 22)`);
     renderer.render(scene,camera);
+    if(T.mirror)T.mirror.ctx.drawImage(renderer.domElement,0,0);
   }
 }
 function fit(){
