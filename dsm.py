@@ -269,9 +269,14 @@ def sanity(ndsm, dem, dsm, valid, gsd):
     return r
 
 
-def export_viewer(out_dir, name, rgb, surf, gsd, kind, meta_extra, max_px=1024):
+def export_viewer(out_dir, name, rgb, surf, gsd, kind, meta_extra, max_px=1024,
+                  ndsm=None):
     """Viewer assets. Heights are downsampled to <= max_px per side (mesh is
-    1024 verts anyway); the texture keeps up to 2048 px for sharpness."""
+    1024 verts anyway); the texture keeps up to 2048 px for sharpness.
+
+    ndsm (DSM scenes): height above ground on the same grid, written as
+    <name>_ndsm.bin. The viewer decides what is a building WALL from it, not
+    from the DSM slope - otherwise every steep hillside is painted as facade."""
     from PIL import Image
     os.makedirs(out_dir, exist_ok=True)
     H, W = surf.shape
@@ -289,6 +294,12 @@ def export_viewer(out_dir, name, rgb, surf, gsd, kind, meta_extra, max_px=1024):
     Image.fromarray(tex).save(os.path.join(out_dir, f"{name}_tex.jpg"),
                               quality=92, subsampling=0)
     hs.astype(np.float32).tofile(os.path.join(out_dir, f"{name}_h.bin"))
+    extra = {}
+    if ndsm is not None:
+        ns = P.resample_hw(np.where(np.isfinite(ndsm), ndsm, 0.0).astype(np.float32),
+                           (h2, w2), order=1)
+        ns.astype(np.float32).tofile(os.path.join(out_dir, f"{name}_ndsm.bin"))
+        extra = {"has_ndsm": True, "ndsm_p99": float(np.percentile(ns, 99))}
     meta = {"name": name, "width": int(w2), "height": int(h2),
             "gsd_m": round(float(g2), 4), "gsd_asserted": False,
             "extent_m": [float(w2 * g2), float(h2 * g2)],
@@ -296,7 +307,10 @@ def export_viewer(out_dir, name, rgb, surf, gsd, kind, meta_extra, max_px=1024):
             "h_p99": float(np.percentile(hs, 99)),
             "h_base": float(np.percentile(hs, 1)) if kind == "dsm" else 0.0,
             "source": "prediction", "kind": kind, "has_reference": False,
-            "tile_id": name}
+            "tile_id": name,
+            # terrain scenes open at true scale; 2x makes hills look like cliffs
+            "vex_default": 1.0 if kind == "dsm" else 2.0}
+    meta.update(extra)
     meta.update(meta_extra)
     with open(os.path.join(out_dir, f"{name}_meta.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
@@ -307,8 +321,8 @@ def export_viewer(out_dir, name, rgb, surf, gsd, kind, meta_extra, max_px=1024):
             scenes = json.load(open(sp, encoding="utf-8"))
         except Exception:
             scenes = []
-    if name not in scenes:
-        scenes.insert(0, name)
+    scenes = [n for n in scenes if n != name]
+    scenes.insert(0, name)                 # the viewer opens the newest run
     with open(sp, "w", encoding="utf-8") as f:
         json.dump(scenes, f)
     print(f"[viewer] {name}: {w2}x{h2} @ {g2:.3f} m, kind={kind} -> {out_dir}")
@@ -330,15 +344,32 @@ BACKENDS = {
 }
 DEFAULT_HEAD = os.path.join("dw_run", "ckpt", "best.pt")
 
+# named models for the demo: `python dsm.py --model ours`
+MODELS = {
+    "rs3dada": {"backend": "rs3dada", "head": None, "label": None},
+    # our best measured model: 1,500 GAMUS training tiles, RMSE 4.69 m on the
+    # 40 held-out test tiles (vs RS3DAda 6.74 m). Copy its best.pt here as
+    # dw_run/ckpt/best_1500.pt (do NOT open or unzip it).
+    "ours": {"backend": "dinov3",
+             "head": os.path.join("dw_run", "ckpt", "best_1500.pt"),
+             "label": "DINOv3-SAT head, 1,500 GAMUS tiles (ours)"},
+}
+
 
 def get_dinov3(head_path=None):
     head_path = head_path or DEFAULT_HEAD
     if not os.path.exists(head_path):
         raise SystemExit(
             f"trained head not found: {head_path}\n"
-            "  Copy best.pt from the training run (Google Drive or the training PC:\n"
-            "  dw_run/ckpt/best.pt) into this repo at dw_run/ckpt/best.pt,\n"
-            "  or pass its location with --head <path to best.pt>.")
+            "  Copy best.pt from the training run (Google Drive or the training PC)\n"
+            f"  into this repo so that it is exactly: {head_path}\n"
+            "  It must be ONE file - do not double-click, open or unzip it.\n"
+            "  Or pass its location with --head <path to best.pt>.")
+    if os.path.isdir(head_path):
+        raise SystemExit(
+            f"{head_path} is a FOLDER, not a file: it was unzipped (a .pt file is a\n"
+            "  zip inside, and WinRAR/7-Zip opens it on double-click). Delete that\n"
+            "  folder and copy the original best.pt file again without opening it.")
     import train_head as TH
     try:
         enc = TH.DinoV3Encoder()
@@ -370,7 +401,7 @@ def get_backend(name, ckpt=None, synrs3d_dir="SynRS3D", head=None):
 def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
         model_gsd=None, tta=True, tile=None,
         dem=None, export=None, name=None, ckpt=None, synrs3d_dir="SynRS3D",
-        source_note=None, head=None):
+        source_note=None, head=None, label=None):
     cfg = BACKENDS.get(backend, BACKENDS["rs3dada"])
     model_gsd = model_gsd or cfg["model_gsd"]
     tile = tile or cfg["tile"]
@@ -400,7 +431,7 @@ def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
     ndsm[~valid] = np.nan
     print(f"[model] nDSM done in {time.time()-t1:.0f} s")
 
-    base_tags = {"PRODUCT": "", "MODEL": cfg["label"],
+    base_tags = {"PRODUCT": "", "MODEL": label or cfg["label"],
                  "INPUT_IMAGE": image, "INPUT_GSD_M": round(in_gsd, 4),
                  "MODEL_GSD_M": model_gsd, "TTA": tta}
     if source_note:
@@ -460,7 +491,8 @@ def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
         if kind == "dsm":
             extra.update(dem_credit=report["dem_credit"], caveat=report["caveat"],
                          vertical_datum=report["vertical_datum"])
-        report["viewer"] = export_viewer(export, name, rgb, surf, in_gsd, kind, extra)
+        report["viewer"] = export_viewer(export, name, rgb, surf, in_gsd, kind, extra,
+                                         ndsm=ndsm if kind == "dsm" else None)
 
     report["seconds"] = round(time.time() - t0, 1)
     with open(os.path.join(out, "report.json"), "w", encoding="utf-8") as f:
@@ -593,6 +625,9 @@ def main():
     ap.add_argument("--backend", choices=list(BACKENDS), default="rs3dada",
                     help="rs3dada (default, public weights) or dinov3 (our trained "
                          "head: needs --head best.pt and a DINOv3 HuggingFace login)")
+    ap.add_argument("--model", choices=list(MODELS), default=None,
+                    help="named model; 'ours' = our 1,500-tile DINOv3 head "
+                         "(needs dw_run/ckpt/best_1500.pt and a DINOv3 login)")
     ap.add_argument("--head", default=None,
                     help=f"trained DINOv3 head checkpoint (default {DEFAULT_HEAD})")
     ap.add_argument("--ckpt", default=None)
@@ -615,18 +650,24 @@ def main():
 
     if a.fetch_sample:
         return fetch_sample()
+    label = None
+    if a.model:
+        m = MODELS[a.model]
+        a.backend, label = m["backend"], m["label"]
+        a.head = a.head or m["head"]
+    tag = a.model or a.backend
     image, dem, credit, name = a.image, a.dem, a.credit, a.name
     if image is None:
         image, dem = SAMPLE["rgb"], dem or [SAMPLE["dem"]]
         credit = credit or SAMPLE["credit"]
-        name = name or ("chungthang" if a.backend == "rs3dada" else f"chungthang_{a.backend}")
+        name = name or ("chungthang" if tag == "rs3dada" else f"chungthang_{tag}")
     window = tuple(int(v) for v in a.window.split(",")) if a.window else None
     out = a.out or os.path.join("out_dsm", name or
                                 os.path.splitext(os.path.basename(image))[0])
     rep = run(image, out, backend=a.backend, window=window, gsd=a.gsd,
               model_gsd=a.model_gsd, tta=not a.no_tta, tile=a.tile, dem=dem,
               export=a.export or None, name=name, ckpt=a.ckpt,
-              synrs3d_dir=a.synrs3d_dir, source_note=credit, head=a.head)
+              synrs3d_dir=a.synrs3d_dir, source_note=credit, head=a.head, label=label)
     print(f"[saved] plain-English numbers: {os.path.abspath(os.path.join(out, 'SUMMARY.txt'))}")
     if not a.no_zip:
         zip_results(out.rstrip("/\\") + "_results.zip", out, a.export,

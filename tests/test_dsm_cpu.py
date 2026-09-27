@@ -130,6 +130,14 @@ def main():
               {"results/dsm.tif", "results/SUMMARY.txt", "results/report.json",
                "viewer/syn_h.bin", "viewer/syn_meta.json"} <= set(names), f"{len(names)} files")
 
+        # viewer: height-above-ground layer + true-scale default for DSM scenes
+        check("viewer writes _ndsm.bin for DSM",
+              meta.get("has_ndsm") is True and os.path.getsize(
+                  os.path.join(exp, "syn_ndsm.bin")) == hb.size * 4)
+        nb = np.fromfile(os.path.join(exp, "syn_ndsm.bin"), np.float32)
+        check("viewer nDSM values = model nDSM", np.allclose(nb[nb != 0], 7.5, atol=1e-4))
+        check("DSM scene opens at 1.0x", meta.get("vex_default") == 1.0)
+
         # ---- 3. window read keeps the georeference right
         out2 = os.path.join(tmp, "out2")
         M.run(img, out2, fn=const_backend(1.0), dem=[dem_p], window=(100, 120, 64, 50),
@@ -154,6 +162,31 @@ def main():
               and rd.max() > 0.9)
         check("PNG viewer kind=rdsm",
               json.load(open(os.path.join(tmp, "v3", "p_meta.json")))["kind"] == "rdsm")
+
+        p_meta = json.load(open(os.path.join(tmp, "v3", "p_meta.json")))
+        check("rDSM scene: no nDSM layer, 2.0x", not p_meta.get("has_ndsm")
+              and p_meta.get("vex_default") == 2.0)
+
+        # ---- 4b. --model ours preset (no weights here: check the wiring and
+        # the messages a teammate would see)
+        check("preset 'ours' -> dinov3 + best_1500.pt",
+              M.MODELS["ours"]["backend"] == "dinov3"
+              and M.MODELS["ours"]["head"].endswith("best_1500.pt"))
+        import subprocess
+        r = subprocess.run([sys.executable, "dsm.py", "--model", "ours", "--export", "",
+                            "--out", os.path.join(tmp, "o_ours")],
+                           capture_output=True, text=True, cwd=ROOT)
+        msg = r.stdout + r.stderr
+        check("missing best_1500.pt -> clear message",
+              r.returncode != 0 and "best_1500.pt" in msg and "do not double-click" in msg,
+              msg.strip().splitlines()[-1][:80] if msg.strip() else "")
+        fake = os.path.join(tmp, "unzipped.pt")
+        os.makedirs(os.path.join(fake, "data"))
+        r = subprocess.run([sys.executable, "dsm.py", "--model", "ours", "--head", fake,
+                            "--export", "", "--out", os.path.join(tmp, "o_ours2")],
+                           capture_output=True, text=True, cwd=ROOT)
+        check("unzipped best.pt folder -> clear message",
+              r.returncode != 0 and "is a FOLDER" in (r.stdout + r.stderr))
 
         # ---- 5. GLO-30 tile naming
         u = M.glo30_tiles((88.58, 27.55, 88.69, 27.65))
