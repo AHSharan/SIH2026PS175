@@ -114,7 +114,9 @@
 
 <div class="panel" id="right">
   <h2>Probe</h2>
-  <div class="kv"><span>Height</span><b id="p-h">—</b></div>
+  <div class="kv"><span id="p-hl">Height</span><b id="p-h">—</b></div>
+  <div class="kv" id="p-ag-row" style="display:none">
+    <span>Above ground</span><b id="p-ag">—</b></div>
   <div class="kv"><span>Slope</span><b id="p-s">—</b></div>
   <div class="kv"><span>X / Y</span><b id="p-xy">—</b></div>
   <div class="kv" id="p-err-row" style="display:none">
@@ -264,7 +266,7 @@ function buildMesh(){
     roughness:0.93, metalness:0.0, flatShading:false
   });
   if(mode!=='tex'){ applyColors(geo,N); }
-  else { applyWallness(geo); wallShader(mat); }
+  else { if(S.hag) applyWallnessHAG(geo,N); else applyWallness(geo); wallShader(mat); }
 
   mesh=new THREE.Mesh(geo,mat);
   mesh.castShadow=mesh.receiveShadow=true;
@@ -298,16 +300,44 @@ function applyWallness(geo){
     w[i]=t*t*(3-2*t);
   }
   geo.setAttribute('wallness',new THREE.BufferAttribute(w,1));
+  // facade shading height = the vertex's own height (the old behaviour)
+  const pos=geo.attributes.position, hg=new Float32Array(n);
+  for(let i=0;i<n;i++) hg[i]=pos.getY(i);
+  geo.setAttribute('hag',new THREE.BufferAttribute(hg,1));
+}
+// DSM scenes: the surface is terrain + objects, and a steep hillside has the
+// same normal as a building wall, so the normal test paints whole mountains
+// grey. Decide walls from the model's height ABOVE GROUND instead: it is flat
+// on a hillside and jumps only at buildings and trees.
+function applyWallnessHAG(geo,N){
+  const {W,H,gsd}=S, n=N*N, w=new Float32Array(n), hg=new Float32Array(n);
+  const A=S.hag, at=(x,y)=>A[Math.max(0,Math.min(H-1,y))*W+Math.max(0,Math.min(W-1,x))];
+  for(let j=0;j<N;j++){
+    const sy=Math.min(H-1,Math.round(j*(H-1)/(N-1)));
+    for(let i=0;i<N;i++){
+      const sx=Math.min(W-1,Math.round(i*(W-1)/(N-1)));
+      const gx=(at(sx+1,sy)-at(sx-1,sy))/(2*gsd), gy=(at(sx,sy+1)-at(sx,sy-1))/(2*gsd);
+      // normal of the above-ground surface as drawn (with exaggeration), then
+      // the same smoothstep(0.75 -> 0.35) as applyWallness
+      const ny=1/Math.sqrt(1+vex*vex*(gx*gx+gy*gy));
+      const t=Math.min(1,Math.max(0,(0.75-ny)/(0.75-0.35)));
+      w[j*N+i]=t*t*(3-2*t);
+      hg[j*N+i]=at(sx,sy)*vex;
+    }
+  }
+  geo.setAttribute('wallness',new THREE.BufferAttribute(w,1));
+  geo.setAttribute('hag',new THREE.BufferAttribute(hg,1));
 }
 function wallShader(mat){
   mat.onBeforeCompile=sh=>{
     sh.vertexShader=`attribute float wallness;
+attribute float hag;
 varying float vWall;
 varying float vWorldY;
 ` + sh.vertexShader.replace('#include <begin_vertex>',
         `#include <begin_vertex>
   vWall = wallness;
-  vWorldY = (modelMatrix * vec4(position,1.0)).y;`);
+  vWorldY = hag;`);
     sh.fragmentShader=`varying float vWall;
 varying float vWorldY;
 uniform float uHMax;
@@ -318,7 +348,8 @@ uniform float uHMax;
   float hfrac = clamp(vWorldY / max(uHMax, 1.0), 0.0, 1.0);
   vec3 facade = mix(vec3(0.17,0.18,0.21), vec3(0.42,0.43,0.47), hfrac);
   diffuseColor.rgb = mix(diffuseColor.rgb, facade, clamp(vWall,0.0,1.0));`);
-    sh.uniforms.uHMax={value:(S?(S.meta.h_p99-base())*vex:40.0)};
+    sh.uniforms.uHMax={value:(!S?40.0:(S.hag?(S.meta.ndsm_p99||10)*vex
+                                            :(S.meta.h_p99-base())*vex))};
     mat.userData.sh=sh;
   };
   mat.customProgramCacheKey=()=>'wall';
@@ -383,11 +414,21 @@ async function loadScene(name){
     try{ref=new Float32Array(await (await fetch(`${ASSETS}/${name}_ref.bin`)).arrayBuffer());}
     catch(e){ref=null;}
   }
+  let hag=null;
+  if(meta.has_ndsm){
+    try{hag=new Float32Array(await (await fetch(`${ASSETS}/${name}_ndsm.bin`)).arrayBuffer());
+        if(hag.length!==heights.length)hag=null;}
+    catch(e){hag=null;}
+  }
   texMap=await new THREE.TextureLoader().loadAsync(`${ASSETS}/${name}_tex.jpg`);
   texMap.colorSpace=THREE.SRGBColorSpace;
   texMap.anisotropy=renderer.capabilities.getMaxAnisotropy();
 
-  S={meta,heights,pred:heights,ref,W:meta.width,H:meta.height,gsd:meta.gsd_m};
+  S={meta,heights,pred:heights,ref,hag,W:meta.width,H:meta.height,gsd:meta.gsd_m};
+  // each scene opens at its own sensible scale (DSM 1.0x, GAMUS tiles 2.0x)
+  vex=meta.vex_default||2.0;$('vex').value=vex;$('vexv').textContent=vex.toFixed(1)+'×';
+  $('p-ag-row').style.display=hag?'flex':'none';
+  $('p-hl').textContent=meta.kind==='dsm'?'Elevation':'Height';
   surf='pred';
 
   $('srcrow').style.display=ref?'grid':'none';
@@ -534,6 +575,9 @@ function pick(e){
 function showProbe(px,py){
   const h=heightAt(px,py);
   $('p-h').textContent=h.toFixed(2)+' m';
+  if(S.hag){const k=Math.max(0,Math.min(S.H-1,Math.round(py)))*S.W+
+                    Math.max(0,Math.min(S.W-1,Math.round(px)));
+    $('p-ag').textContent=S.hag[k].toFixed(2)+' m';}
   $('p-s').textContent=slopeAt(px,py).toFixed(1)+'°';
   $('p-xy').textContent=`${px.toFixed(0)}, ${py.toFixed(0)} px`;
   if(S.ref){
@@ -657,6 +701,13 @@ window.DW={setMode:m=>{const b=document.querySelector(`[data-mode="${m}"]`);
                         dist*Math.cos(e)*Math.cos(a));
     lookAtPoint(new THREE.Vector3(0,(S.meta.h_p99-base())*vex*0.35,0));},
   probeAt:(px,py)=>showProbe(px,py),
+  // test hook: share of the mesh shaded as facade, overall and where the
+  // above-ground height is under / over 2 m (read-only)
+  wallStats:()=>{const w=mesh.geometry.attributes.wallness, h=mesh.geometry.attributes.hag;
+    if(!w)return null; let a=0,lo=0,nlo=0,hi=0,nhi=0;
+    for(let i=0;i<w.count;i++){const v=w.getX(i)>0.5?1:0; a+=v;
+      const g=h?h.getX(i)/vex:0; if(S.hag&&g>2){hi+=v;nhi++;} else {lo+=v;nlo++;}}
+    return {all:a/w.count, low:nlo?lo/nlo:0, high:nhi?hi/nhi:0};},
   // render and read back in the SAME tick, else the buffer is already cleared.
   // Capture at the canvas's native backing size (devicePixelRatio already
   // gives us 2400x1350); resizing the renderer mid-capture mis-framed the view.
