@@ -34,7 +34,10 @@ class H(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         # live results are rewritten in place: never serve a stale scene
-        if self.path.startswith("/assets_live/"):
+        # the viewer page itself too: after a `git pull` the browser otherwise
+        # keeps running the OLD cached index.html (seen in testing)
+        p = urlparse(self.path).path
+        if p.startswith("/assets_live/") or p == "/" or p.endswith(".html"):
             self.send_header("Cache-Control", "no-store")
         super().end_headers()
 

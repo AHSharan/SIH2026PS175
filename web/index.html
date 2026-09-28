@@ -379,6 +379,16 @@ function applyWallness(geo){
 function applyWallnessHAG(geo,N){
   const {W,H,gsd}=S, n=N*N, w=new Float32Array(n), hg=new Float32Array(n);
   const A=S.hag, at=(x,y)=>A[Math.max(0,Math.min(H-1,y))*W+Math.max(0,Math.min(W-1,x))];
+  // trees also jump in height above ground, and painting them as facades made
+  // the forest a field of grey blobs and ridge "ribbons". When the scene has a
+  // building-footprint map, only building edges (+-2 px) are shaded as walls;
+  // trees keep their photo texture.
+  const B=S.bldId, R=2;
+  const nearBld=(x,y)=>{
+    for(let dy=-R;dy<=R;dy++){const yy=Math.max(0,Math.min(H-1,y+dy));
+      for(let dx=-R;dx<=R;dx++){if(B[yy*W+Math.max(0,Math.min(W-1,x+dx))])return true;}}
+    return false;
+  };
   for(let j=0;j<N;j++){
     const sy=Math.min(H-1,Math.round(j*(H-1)/(N-1)));
     for(let i=0;i<N;i++){
@@ -388,7 +398,7 @@ function applyWallnessHAG(geo,N){
       // the same smoothstep(0.75 -> 0.35) as applyWallness
       const ny=1/Math.sqrt(1+vex*vex*(gx*gx+gy*gy));
       const t=Math.min(1,Math.max(0,(0.75-ny)/(0.75-0.35)));
-      w[j*N+i]=t*t*(3-2*t);
+      w[j*N+i]=(B&&!nearBld(sx,sy))?0:t*t*(3-2*t);
       hg[j*N+i]=at(sx,sy)*vex;
     }
   }
@@ -905,6 +915,10 @@ function tourPose(u){
   const pos=new THREE.Vector3(r*Math.sin(ang),EX*(0.55-0.36*e)+tgt.y,r*Math.cos(ang));
   const [px,py]=worldToPx(pos.x,pos.z);
   if(px>=0&&py>=0&&px<S.W&&py<S.H)pos.y=Math.max(pos.y,(heightAt(px,py)-base())*vex+25);
+  // never below the scene's highest point: on a hillside (220 m relief) the
+  // clamp above only protects the ground under the camera, and the slope
+  // beside it cut through the view. Also keeps the pass above tall towers.
+  pos.y=Math.max(pos.y,(S.meta.h_max-base())*vex+EX*0.12);
   return {pos,tgt};
 }
 function applyTour(u){ const {pos,tgt}=tourPose(u); camera.position.copy(pos); lookAtPoint(tgt); }
