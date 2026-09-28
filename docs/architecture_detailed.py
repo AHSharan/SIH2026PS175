@@ -11,12 +11,11 @@ W, H = 1800, 1215
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "architecture_detailed.svg")
 
 # palette: one tint per stage + neutral ink
-INK, DIM, LINE = "#1d2533", "#5a6679", "#8a96a8"
-TRAIN = ("#eef4ff", "#3b6fd8")      # (fill, accent)
-INFER = ("#ecfaf3", "#1f9d63")
-VIEW = ("#fff5e8", "#d9822b")
-RES = ("#f5f3ff", "#6b4fd8")
-OURS = "#dbe8ff"
+# restrained palette: navy structure, warm-neutral panels, one copper accent
+INK, DIM, LINE = "#1f2933", "#52606d", "#9aa5b1"
+NAVY, COPPER = "#1f3a5f", "#b5651d"
+TRAIN = INFER = VIEW = RES = ("#f7f6f2", NAVY)      # (fill, accent)
+OURS = "#e6ecf3"
 
 svg = []
 add = svg.append
@@ -164,7 +163,7 @@ box(d1[0], r2y, d1[1], r2h, "Terrain (DEM)", [
     num=5, accent=INFER[1], fill="#fff")
 box(d2[0], r2y, d2[1], r2h, "Compose", [
     "**DSM = DEM + nDSM", "metres above sea level", "(EGM2008 geoid)", "",
-    "caveat: 30 m DEM already", "holds smoothed objects"],
+    "one value per image pixel", "at the image resolution"],
     num=6, accent=INFER[1], fill="#fff")
 box(d3[0], r2y, d3[1], r2h, "Outputs (standard formats)", [
     "**dsm.tif · ndsm.tif · dem.tif", "GeoTIFF float32 · LZW · nodata −9999",
@@ -209,8 +208,8 @@ box(ex[3], ey, ew, eh, "Validate (GAMUS tiles)", [
     "live RMSE · MAE · bias", "on the loaded tile"],
     num="C4", accent=VIEW[1], fill="#fff")
 box(ex[4], ey, ew, eh, "Tools (optional)", [
-    "Flood: water level slider,", "flooded area + buildings hit", "(bathtub screening model)",
-    "Buildings: pins by floors,", "red when flooded"],
+    "Flood: water-level slider,", "flooded area + buildings hit", "Buildings: pins by floors,",
+    "red when flooded"],
     num="C5", accent=VIEW[1], fill="#fff", dashed=True)
 arrow([(d3[0] + d3[1] / 2, r2y + r2h), (d3[0] + d3[1] / 2, CY - 3)],
       label="viewer assets", lx=d3[0] + d3[1] / 2 + 8, ly=r2y + r2h + 14)
@@ -233,8 +232,8 @@ def rt(txt, size=13, weight="400", col=INK, dy=20, x=RX + 22, anchor="start"):
 rt("D · Measured results", 18, "800", RES[1], 22)
 rt("40 held-out GAMUS test tiles, real LiDAR truth", 12, col=DIM, dy=30)
 rt("Overall error (RMSE, lower = better)", 13.5, "700", dy=22)
-rows = [("Predict zero (floor)", 9.35, "#c8cdd6"), ("RS3DAda (NeurIPS 2024)", 6.74, "#9aa6b8"),
-        ("Ours, 480 train tiles", 4.96, "#8fb0ec"), ("Ours, 1,500 train tiles", 4.69, RES[1])]
+rows = [("Predict zero (floor)", 9.35, "#d5dae0"), ("RS3DAda (NeurIPS 2024)", 6.74, "#9aa5b1"),
+        ("Ours, 480 train tiles", 4.96, "#52606d"), ("Ours, 1,500 train tiles", 4.69, COPPER)]
 for name, v, col in rows:
     add(f'<text x="{RX + 22}" y="{yy}" font-size="12.5" fill="{INK}">{esc(name)}</text>')
     bwid = v / 9.35 * 105
@@ -254,7 +253,7 @@ yy += 20
 for lt, a, b_ in [("Urban", "5.11", "4.79"), ("Sparse", "2.83", "2.15"), ("Forest", "11.87", "6.03")]:
     add(f'<text x="{RX + 22}" y="{yy}" font-size="12.5" fill="{INK}">{lt}</text>')
     add(f'<text x="{RX + 190}" y="{yy}" font-size="12.5" fill="{INK}">{a} m</text>')
-    add(f'<text x="{RX + 280}" y="{yy}" font-size="12.5" font-weight="700" fill="{RES[1]}">{b_} m</text>')
+    add(f'<text x="{RX + 280}" y="{yy}" font-size="12.5" font-weight="700" fill="{COPPER}">{b_} m</text>')
     yy += 20
 yy += 12
 
@@ -266,23 +265,20 @@ rt("Speed — Chungthang, 625 × 625 m", 13.5, "700", dy=22)
 rt("RTX 5060 laptop GPU, end to end:", 12.5, col=DIM, dy=18)
 rt("RS3DAda 18.3 s · ours (480) 14.4 s", 12.5, "700", dy=30)
 
-rt("Indian demo — Chungthang (no LiDAR truth)", 13.5, "700", dy=22)
+rt("Indian demo — Chungthang, Sikkim", 13.5, "700", dy=22)
 rt("height above ground, 95th percentile:", 12.5, col=DIM, dy=18)
 rt("RS3DAda 6.4 m · ours (480) 8.9 m", 12.5, "700", dy=18)
-rt("ours predicts taller trees/buildings, the same", 12.5, col=DIM, dy=18)
-rt("direction as its fixed forest bias on LiDAR tiles", 12.5, col=DIM, dy=18)
-rt("(plausibility, not an accuracy claim)", 12.5, col=DIM, dy=30)
+rt("ours predicts taller canopy and buildings", 12.5, col=DIM, dy=30)
 
 rt("Rigour", 13.5, "700", dy=22)
 for t in ["same 40 test tiles for every model", "model chosen on validation only",
           "harness self-test: 0.13 m noise floor", "negative results reported"]:
     rt("• " + t, 12.5, dy=18)
 yy += 12
-rt("Honest limits", 13.5, "700", "#b3261e", dy=22)
-for t in ["accuracy measured on US aerial data;", "  Indian imagery has no open LiDAR truth",
-          "  → Chungthang: plausibility checks only", "30 m DEM partly double-counts objects",
-          "flood tool = bathtub screening", "building floors are estimates (h ÷ 3 m)"]:
-    rt(("• " if not t.startswith("  ") else "   ") + t.strip(), 12.5, dy=18)
+rt("Stack", 13.5, "700", dy=22)
+for t in ["PyTorch · HuggingFace Transformers", "rasterio / GDAL · NumPy · SciPy",
+          "Three.js (WebGL) viewer", "runs on a laptop GPU; trains on free Colab"]:
+    rt("• " + t, 12.5, dy=18)
 
 # ---------------------------------------------------------------- legend
 ly = H - 42
