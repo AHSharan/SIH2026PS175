@@ -232,7 +232,7 @@
 <text x="1422" y="196" font-size="12.5" fill="#1f2933">Predict zero (floor)</text>
 <rect x="1585" y="184" width="105.0" height="15" rx="3" fill="#d5dae0"/>
 <text x="1695.0" y="196" font-size="12.5" font-weight="700" fill="#1f2933">9.35 m</text>
-<text x="1422" y="221" font-size="12.5" fill="#1f2933">RS3DAda (NeurIPS 2024)</text>
+<text x="1422" y="221" font-size="12.5" fill="#1f2933">RS3DAda (measured)</text>
 <rect x="1585" y="209" width="75.7" height="15" rx="3" fill="#9aa5b1"/>
 <text x="1665.7" y="221" font-size="12.5" font-weight="700" fill="#1f2933">6.74 m</text>
 <text x="1422" y="246" font-size="12.5" fill="#1f2933">Ours, 480 train tiles</text>

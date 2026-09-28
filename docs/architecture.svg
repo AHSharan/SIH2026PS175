@@ -64,7 +64,7 @@
 <rect x="40" y="610" width="500" height="92" rx="8" fill="#f5f4f0" stroke="#9aa5b1" stroke-width="1"/>
 <rect x="40" y="610" width="6" height="92" rx="3" fill="#b5651d"/>
 <text x="64" y="654" font-size="30" font-weight="800" fill="#1f3a5f">4.69 m error</text>
-<text x="64" y="682" font-size="15.5" fill="#1f2933">vs 6.74 m for RS3DAda (NeurIPS 2024): 30% lower</text>
+<text x="64" y="682" font-size="15.5" fill="#1f2933">vs 6.74 m for RS3DAda, measured on the same tiles: 30% lower</text>
 <rect x="560" y="610" width="480" height="92" rx="8" fill="#f5f4f0" stroke="#9aa5b1" stroke-width="1"/>
 <rect x="560" y="610" width="6" height="92" rx="3" fill="#b5651d"/>
 <text x="584" y="654" font-size="30" font-weight="800" fill="#1f3a5f">Forest error halved</text>

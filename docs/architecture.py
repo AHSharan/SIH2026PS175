@@ -106,7 +106,7 @@ add(f'<text x="600" y="{TY + 112}" font-size="13" fill="{DIM}" font-style="itali
 
 # ---- key numbers
 SY = 610
-stat(40, SY, 500, "4.69 m error", "vs 6.74 m for RS3DAda (NeurIPS 2024): 30% lower")
+stat(40, SY, 500, "4.69 m error", "vs 6.74 m for RS3DAda, measured on the same tiles: 30% lower")
 stat(560, SY, 480, "Forest error halved", "11.9 m → 6.0 m; better on urban & sparse too")
 stat(1060, SY, 500, "14 s per scene", "625 × 625 m, end to end, laptop GPU")
 add(f'<text x="40" y="{H - 22}" font-size="13" fill="{DIM}">Error = RMSE against LiDAR on 40 '

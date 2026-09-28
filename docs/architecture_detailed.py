@@ -232,7 +232,7 @@ def rt(txt, size=13, weight="400", col=INK, dy=20, x=RX + 22, anchor="start"):
 rt("D · Measured results", 18, "800", RES[1], 22)
 rt("40 held-out GAMUS test tiles, real LiDAR truth", 12, col=DIM, dy=30)
 rt("Overall error (RMSE, lower = better)", 13.5, "700", dy=22)
-rows = [("Predict zero (floor)", 9.35, "#d5dae0"), ("RS3DAda (NeurIPS 2024)", 6.74, "#9aa5b1"),
+rows = [("Predict zero (floor)", 9.35, "#d5dae0"), ("RS3DAda (measured)", 6.74, "#9aa5b1"),
         ("Ours, 480 train tiles", 4.96, "#52606d"), ("Ours, 1,500 train tiles", 4.69, COPPER)]
 for name, v, col in rows:
     add(f'<text x="{RX + 22}" y="{yy}" font-size="12.5" fill="{INK}">{esc(name)}</text>')
