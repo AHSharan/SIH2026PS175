@@ -141,7 +141,7 @@ def main():
         f'fill="{INK}"/></marker></defs>')
     add(f'<rect width="{W}" height="{H}" fill="#ffffff"/>')
     add(f'<text x="{W / 2}" y="40" text-anchor="middle" font-size="27" font-weight="700" '
-        f'fill="{INK}">DepthWizard: Proposed System Architecture</text>')
+        f'fill="{INK}">DepthWizard: System Architecture</text>')
 
     # ------------------------------------------------------------ (a) data
     panel(40, 60, 1330, 322, "(a) Data Acquisition")
