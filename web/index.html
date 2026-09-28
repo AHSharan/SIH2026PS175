@@ -23,6 +23,13 @@
   #tools .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
   #tools .note{color:var(--dim);font-size:10.5px;margin-top:5px;line-height:1.35}
   #tools button:disabled{opacity:.4;cursor:not-allowed}
+  #live input[type=file],#live input[type=number]{width:100%;font:inherit;font-size:12px;
+    color:var(--fg);background:#1b2434;border:1px solid var(--line);border-radius:6px;padding:5px}
+  #live .note{color:var(--dim);font-size:10.5px;margin-top:5px;line-height:1.35}
+  #lv-log{font:10.5px ui-monospace,monospace;color:var(--dim);white-space:pre-wrap;
+    max-height:90px;overflow:auto;margin-top:5px}
+  #live .bar{height:4px;background:#1b2434;border-radius:2px;margin-top:6px;overflow:hidden}
+  #live .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
   #bottom{bottom:14px;left:50%;transform:translateX(-50%);
     display:flex;gap:16px;align-items:center;padding:9px 16px}
   h1{margin:0 0 2px;font-size:15px;letter-spacing:.2px}
@@ -118,6 +125,21 @@
 </div>
 
 <div id="rcol">
+<div class="panel" id="live" style="display:none">
+  <h2 style="margin-top:0">Run a model <span style="text-transform:none;letter-spacing:0">(live)</span></h2>
+  <input type="file" id="lv-file" accept=".tif,.tiff,.png,.jpg,.jpeg">
+  <label for="lv-model">Model</label>
+  <select id="lv-model"></select>
+  <div id="lv-gsd-row" style="display:none">
+    <label for="lv-gsd">Pixel size (m) - PNG/JPG only</label>
+    <input type="number" id="lv-gsd" min="0.05" max="5" step="0.05" value="0.5">
+  </div>
+  <button id="lv-run" style="margin-top:8px">Run</button>
+  <div class="bar"><i id="lv-bar"></i></div>
+  <div class="note" id="lv-st">GeoTIFF gives a real elevation map (terrain added); PNG/JPG
+    gives heights above ground only.</div>
+  <div id="lv-log"></div>
+</div>
 <div class="panel" id="right">
   <h2>Probe</h2>
   <div class="kv"><span id="p-hl">Height</span><b id="p-h">—</b></div>
@@ -217,7 +239,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 
 const $=id=>document.getElementById(id);
-const ASSETS=new URLSearchParams(location.search).get('assets')||'assets';
+let ASSETS=new URLSearchParams(location.search).get('assets')||'assets';
 const MESH_N=1024;              // mesh grid resolution (verts per side)
 
 /* ---------------------------------------------------------------- scene */
@@ -995,17 +1017,76 @@ addEventListener('resize',fit);
 new ResizeObserver(fit).observe(document.body);
 
 /* --------------------------------------------------------------- boot */
-(async()=>{
-  const scenes=await (await fetch(`${ASSETS}/scenes.json`)).json();
-  const sel=$('scene');
+async function fillScenes(){
+  let scenes=[];
+  try{scenes=await (await fetch(`${ASSETS}/scenes.json`,{cache:'no-store'})).json();}catch(e){}
+  const sel=$('scene'); sel.innerHTML='';
   scenes.forEach(n=>{const o=document.createElement('option');o.value=o.textContent=n;sel.appendChild(o);});
-  sel.onchange=()=>loadScene(sel.value);
+  return scenes;
+}
+(async()=>{
+  const scenes=await fillScenes();
+  $('scene').onchange=()=>loadScene($('scene').value);
   updateSun();
   $('legend').style.display='none';
-  await loadScene(scenes[0]);
+  initLive();
+  const want=new URLSearchParams(location.search).get('scene');
+  if(scenes.length){ await loadScene(scenes.includes(want)?want:scenes[0]);
+    toast('Click the view to capture the mouse, then fly with W A S D',4200); }
+  else { $('loading').textContent='No scenes here yet. Run a model with the panel on the right.';
+    setTimeout(()=>{ if(!S)$('loading').style.display='none'; },2500); }
+  if(want&&scenes.includes(want))$('scene').value=want;
   tick();
-  toast('Click the view to capture the mouse, then fly with W A S D',4200);
 })();
+
+/* ---------------------------------------------------- live mode (serve.py --live)
+   Upload an image, run a model on this machine, open the result here. */
+async function initLive(){
+  let h; try{ h=await (await fetch('api/health',{cache:'no-store'})).json(); }catch(e){ return; }
+  if(!h||!h.live)return;
+  $('live').style.display='block';
+  const env=h.env||{};
+  const sel=$('lv-model'), ms=(await (await fetch('api/models',{cache:'no-store'})).json()).models;
+  ms.forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.label;sel.appendChild(o);});
+  const firstFile=ms.find(m=>m.kind==='checkpoint'); if(firstFile)sel.value=firstFile.id;
+  $('lv-st').textContent=(env.cuda?'GPU: '+env.device:'No GPU: runs on CPU (slow)')+
+    (env.torch?'':' · PyTorch not installed: only Demo works')+
+    (env.hf_token?'':' · HF_TOKEN not set: DINOv3 models will fail');
+  $('lv-file').onchange=()=>{const f=$('lv-file').files[0];
+    $('lv-gsd-row').style.display=f&&/\.(png|jpe?g)$/i.test(f.name)?'block':'none';};
+  $('lv-run').onclick=runLive;
+}
+const LV_STEPS=['queued','loading model','reading image','predicting heights','adding terrain',
+  'building 3D scene','finishing','done'];
+async function runLive(){
+  const f=$('lv-file').files[0]; if(!f){toast('Choose an image first');return;}
+  const isPix=/\.(png|jpe?g)$/i.test(f.name);
+  const q=new URLSearchParams({name:f.name,model:$('lv-model').value});
+  if(isPix)q.set('gsd',$('lv-gsd').value);
+  $('lv-run').disabled=true; $('lv-log').textContent=''; $('lv-bar').style.width='3%';
+  $('lv-st').textContent='Uploading '+(f.size/1e6).toFixed(1)+' MB…';
+  let r;
+  try{ r=await (await fetch('api/run?'+q,{method:'POST',body:f})).json(); }
+  catch(e){ r={error:String(e)}; }
+  if(r.error){ $('lv-st').textContent='Error: '+r.error; $('lv-run').disabled=false; return; }
+  const t0=performance.now();
+  const poll=async()=>{
+    let j; try{ j=await (await fetch('api/job/'+r.job,{cache:'no-store'})).json(); }catch(e){ setTimeout(poll,1500); return; }
+    const k=Math.max(0,LV_STEPS.indexOf(j.stage));
+    $('lv-bar').style.width=Math.round(100*k/(LV_STEPS.length-1))+'%';
+    $('lv-log').textContent=(j.log||[]).join('\n'); $('lv-log').scrollTop=1e9;
+    const sec=((performance.now()-t0)/1000).toFixed(0);
+    if(j.state==='error'){ $('lv-st').textContent='Failed after '+sec+' s: '+j.error;
+      $('lv-run').disabled=false; return; }
+    if(j.state!=='done'){ $('lv-st').textContent=j.stage+'… '+sec+' s'; setTimeout(poll,1000); return; }
+    $('lv-st').textContent='Done in '+j.seconds+' s'+(j.summary&&j.summary.buildings!=null?
+      ' · '+j.summary.buildings+' candidate buildings':'')+'. Opening it…';
+    $('lv-run').disabled=false;
+    ASSETS='assets_live'; await fillScenes(); $('scene').value=r.scene; await loadScene(r.scene);
+    history.replaceState(null,'','?assets=assets_live&scene='+encodeURIComponent(r.scene));
+  };
+  setTimeout(poll,800);
+}
 </script>
 </body>
 </html>

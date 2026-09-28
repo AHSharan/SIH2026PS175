@@ -9,3 +9,6 @@ web/_test_assets/
 dw_run/
 out_dsm/
 web/assets_dsm/
+uploads/
+web/assets_live/
+models/

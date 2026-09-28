@@ -157,6 +157,40 @@ Open this link in Chrome: **http://localhost:8777/?assets=assets_dsm**
 
 ---
 
+## Part E — Live mode: upload any image and run a model from the browser
+
+Use this on the **GPU laptop** for the demo.
+
+**1. Put your model files** (`.pt`) in `SIH2026PS175\dw_run\ckpt\` or in a new
+folder `SIH2026PS175\models\`. Any number of them. Don't unzip them.
+
+**2. Start the viewer in live mode** (Git Bash, in `SIH2026PS175`):
+```
+export HF_TOKEN=hf_YOUR_TOKEN
+```
+```
+python serve.py --live
+```
+It prints which GPU it found and every model file it sees.
+
+**3. Open** http://localhost:8777/?assets=assets_live in Chrome.
+
+**4. In the "Run a model" panel** (top right):
+- **Choose File**: a GeoTIFF (gives a real elevation map) or a PNG/JPG
+  (then also type its pixel size in metres).
+- **Model**: pick one of your `.pt` files, *RS3DAda*, or *Demo* (fake heights, for testing).
+- Press **Run**. When it says *Done*, the result opens in 3D by itself, with
+  Flood, Buildings and Tour available.
+
+The first run with a DINOv3 model takes longer (it loads the model); after
+that each run takes seconds. Results are also saved in `out_dsm\` as usual.
+
+**Which `.pt` files work:** our DINOv3 height models (any `best.pt` or
+`last.pt` from our training) and RS3DAda checkpoints. A `.pt` of a different
+kind of model shows a clear "not a checkpoint type this app can build" message.
+
+---
+
 ## If anything goes wrong
 
 Take a screenshot of the PowerShell window showing the **last lines of text**.
