@@ -68,6 +68,17 @@ All three are off until clicked, in the *Tools (optional)* panel:
 The buildings come from `dsm.py` (`<scene>_bld.json`, `<scene>_bldid.bin`, and a
 count in `SUMMARY.txt`). Skip them with `--no-buildings`.
 
+## Live mode: upload an image in the browser
+
+`python serve.py --live`, then open http://localhost:8777/?assets=assets_live.
+The *Run a model* panel uploads a GeoTIFF/PNG/JPG, runs a chosen model on this
+machine (models are loaded once and kept in memory) and opens the result in 3D.
+Models: every `.pt` in `dw_run/ckpt/` and `models/` (extra folders with
+`--models-dir`) that is one of our DINOv3 height heads or an RS3DAda checkpoint,
+plus the public RS3DAda weights and a Demo model. Images larger than 4096 px are
+centre-cropped to 4096 px (the log says so). Details in `live.py`; tests in
+`tests/test_live_cpu.py` (20/20).
+
 ## Where the results are saved
 
 - `out_dsm/chungthang_results.zip`: **everything in one file** (the GeoTIFFs,
