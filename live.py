@@ -192,12 +192,19 @@ class Jobs:
         self.jobs = {}
         self.lock = threading.Lock()        # one model run at a time (GPU memory)
 
-    def submit(self, filename, data: bytes, model_id, gsd=None):
+    def submit(self, filename, data: bytes, model_id, gsd=None, gsd_unknown=False, gcps=None):
         ext = os.path.splitext(filename)[1].lower()
         if ext not in IMAGE_EXT:
             raise ValueError(f"unsupported file type '{ext}': use GeoTIFF, PNG or JPG")
-        if ext in (".png", ".jpg", ".jpeg") and not gsd:
-            raise ValueError("PNG/JPG has no map information: enter the pixel size in metres")
+        pts = None
+        if gcps and ext in (".png", ".jpg", ".jpeg"):
+            import dsm as M
+            pts = M.parse_gcps(gcps)
+            if len(pts) < 3:
+                raise ValueError(f"{len(pts)} ground control point(s) given: need at least 3")
+        if ext in (".png", ".jpg", ".jpeg") and not (gsd or gsd_unknown or pts):
+            raise ValueError("PNG/JPG has no map information: enter the pixel size, tick "
+                             "'pixel size unknown', or give 3+ ground control points")
         if not any(m["id"] == model_id for m in list_models(self.models.model_dirs)):
             raise ValueError(f"unknown model '{model_id}'")
         jid = time.strftime("%H%M%S") + "_" + uuid.uuid4().hex[:4]
@@ -212,10 +219,11 @@ class Jobs:
                "model": model_id, "file": filename, "error": None, "started": time.time(),
                "seconds": None, "summary": None}
         self.jobs[jid] = job
-        threading.Thread(target=self._run, args=(job, path, gsd), daemon=True).start()
+        threading.Thread(target=self._run, args=(job, path, gsd, gsd_unknown, pts),
+                         daemon=True).start()
         return job
 
-    def _run(self, job, path, gsd):
+    def _run(self, job, path, gsd, gsd_unknown=False, gcps=None):
         with self.lock:
             job["state"] = "running"
             lines = job["log"]
@@ -233,8 +241,10 @@ class Jobs:
                     window = self._window(path)
                     rep = M.run(path, os.path.join(OUT_ROOT, job["scene"]), fn=fn, backend=bname,
                                 gsd=gsd, window=window, export=LIVE_ASSETS, name=job["scene"],
-                                label=label, source_note=f"uploaded: {job['file']}")
-                job["summary"] = {k: rep.get(k) for k in ("kind", "gsd_m", "size_px", "model", "seconds")}
+                                label=label, source_note=f"uploaded: {job['file']}",
+                                gsd_unknown=gsd_unknown, gcps=gcps)
+                job["summary"] = {k: rep.get(k) for k in ("kind", "gsd_m", "size_px", "model", "seconds",
+                                                          "scale_known", "georeferenced_from_gcps")}
                 job["summary"]["sanity"] = rep.get("sanity", {}).get("ndsm_percentiles_m")
                 if rep.get("buildings"):
                     job["summary"]["buildings"] = rep["buildings"]["count"]
@@ -314,7 +324,9 @@ class Live:
         try:
             gsd = float(query.get("gsd")) if query.get("gsd") else None
             job = self.jobs.submit(query.get("name", "upload.tif"), body,
-                                   query.get("model", "demo"), gsd)
+                                   query.get("model", "demo"), gsd,
+                                   gsd_unknown=query.get("gsd_unknown") == "1",
+                                   gcps=query.get("gcps") or None)
             return 200, {"job": job["id"], "scene": job["scene"]}
         except Exception as e:                      # noqa: BLE001
             return 400, {"error": str(e)}

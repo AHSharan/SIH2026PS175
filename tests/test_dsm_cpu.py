@@ -215,6 +215,58 @@ def main():
         check("--no-buildings skips the finder",
               "buildings" not in r_nb and not os.path.exists(os.path.join(tmp, "v_nb", "nb_bld.json")))
 
+        # ---- 4d. PNG + ground control points -> absolute DSM (same as the GeoTIFF)
+        if os.path.exists(M.SAMPLE["rgb"]):
+            from rasterio.warp import transform as warp
+            with rasterio.open(M.SAMPLE["rgb"]) as src_:
+                rgb_s = np.transpose(src_.read(), (1, 2, 0))
+                tr0, crs0 = src_.transform, src_.crs
+            png_s = os.path.join(tmp, "plain.png")
+            Image.fromarray(rgb_s).save(png_s)
+            pix = [(150, 200), (1900, 180), (1020, 1880), (300, 1700)]
+            xs_ = [tr0.c + (c + 0.5) * tr0.a for c, r in pix]
+            ys_ = [tr0.f + (r + 0.5) * tr0.e for c, r in pix]
+            lon_, lat_ = warp(crs0, "EPSG:4326", xs_, ys_)
+            gtxt = "; ".join(f"{c},{r},{la:.7f},{lo:.7f}" for (c, r), la, lo in zip(pix, lat_, lon_))
+            gi = M.georeference_image(png_s, M.parse_gcps(gtxt), os.path.join(tmp, "g.tif"))
+            with rasterio.open(gi["file"]) as g_:
+                tr1 = g_.transform
+            check("GCPs rebuild the map position (< 5 cm, same CRS)",
+                  gi["crs"] == crs0.to_string() and abs(tr1.c - tr0.c) < 0.05
+                  and abs(tr1.f - tr0.f) < 0.05 and abs(tr1.a - tr0.a) < 1e-4,
+                  f"shift {abs(tr1.c - tr0.c):.3f}/{abs(tr1.f - tr0.f):.3f} m")
+            k7 = const_backend(7.0)
+            M.run(M.SAMPLE["rgb"], os.path.join(tmp, "o_t"), fn=k7, dem=[M.SAMPLE["dem"]],
+                  tta=False, backend="const", buildings=False)
+            rg = M.run(png_s, os.path.join(tmp, "o_p"), fn=k7, dem=[M.SAMPLE["dem"]], tta=False,
+                       backend="const", buildings=False, gcps=gtxt)
+            a_ = rasterio.open(os.path.join(tmp, "o_t", "dsm.tif")).read(1)
+            b_ = rasterio.open(os.path.join(tmp, "o_p", "dsm.tif")).read(1)
+            vv = (a_ != -9999) & (b_ != -9999)
+            check("PNG + GCPs gives the same absolute DSM as the GeoTIFF (< 5 cm)",
+                  rg["kind"] == "dsm" and float(np.abs(a_ - b_)[vv].max()) < 0.05,
+                  f"max {float(np.abs(a_ - b_)[vv].max()):.4f} m")
+            for bad, why in [("1,2,27.6,88.6; 3,4,27.61,88.61", "need at least 3"),
+                             ("0,0,27.6,88.6; 10,10,27.61,88.61; 20,20,27.62,88.62", "one line"),
+                             ("150,200,88.6439,27.6066; 1900,180,88.6493,27.6066; "
+                              "1020,1880,88.6466,27.6020", "swapped"),
+                             ("0,0,27.60,88.60; 20,0,27.60,89.60; 0,20,26.60,88.60",
+                              "not plausible")]:
+                try:
+                    M.georeference_image(png_s, M.parse_gcps(bad), os.path.join(tmp, "x.tif"))
+                    check(f"bad GCPs refused ({why})", False)
+                except ValueError as e:
+                    check(f"bad GCPs refused ({why})", why in str(e), str(e)[:60])
+
+        # ---- 4e. PNG with unknown pixel size -> relative shape, clearly labelled
+        ru = M.run(png, os.path.join(tmp, "o_u"), fn=P.dummy_backend(), tta=False,
+                   backend="dummy", gsd_unknown=True, export=os.path.join(tmp, "v_u"), name="u")
+        mu = json.load(open(os.path.join(tmp, "v_u", "u_meta.json")))
+        su = open(os.path.join(tmp, "o_u", "SUMMARY.txt"), encoding="utf-8").read()
+        check("unknown pixel size: runs, relative, labelled",
+              ru["kind"] == "rdsm" and ru["scale_known"] is False and mu["scale_known"] is False
+              and "NOT metres" in su)
+
         # ---- 5. GLO-30 tile naming
         u = M.glo30_tiles((88.58, 27.55, 88.69, 27.65))
         check("GLO-30 tile name", len(u) == 1 and u[0].endswith(

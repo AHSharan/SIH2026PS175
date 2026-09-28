@@ -415,6 +415,81 @@ def export_viewer(out_dir, name, rgb, surf, gsd, kind, meta_extra, max_px=1024,
 
 
 # ==========================================================================
+# PNG/JPG + ground control points -> georeferenced GeoTIFF
+# ==========================================================================
+def parse_gcps(text):
+    """'x_px,y_px,lat,lon' per point, separated by ';' or new lines.
+    x_px/y_px = pixel column/row as shown by e.g. Paint (from the top-left);
+    lat/lon = decimal degrees as Google Maps shows them (right-click a spot)."""
+    pts = []
+    for chunk in str(text).replace("\n", ";").split(";"):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        v = [float(t) for t in chunk.replace(" ", ",").split(",") if t]
+        if len(v) != 4:
+            raise ValueError(f"GCP '{chunk}': need 4 numbers  x_px, y_px, lat, lon")
+        x, y, lat, lon = v
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            raise ValueError(f"GCP '{chunk}': latitude/longitude out of range (lat first, then lon)")
+        pts.append((x, y, lat, lon))
+    return pts
+
+
+def georeference_image(path, gcps, out_tif):
+    """Fit pixel -> UTM metres with >= 3 ground control points (least squares,
+    full affine) and write the image as a georeferenced GeoTIFF. The pixel size
+    comes out of the fit. Returns a small report (RMS residual when >= 4 points)."""
+    import rasterio
+    from rasterio.transform import Affine
+    from rasterio.warp import transform as warp
+    from PIL import Image
+    rgb = np.asarray(Image.open(path).convert("RGB"))
+    H, W = rgb.shape[:2]
+    if len(gcps) < 3:
+        raise ValueError("need at least 3 ground control points")
+    px = np.array([[g[0] + 0.5, g[1] + 0.5] for g in gcps])      # pixel centres
+    if (px[:, 0] < 0).any() or (px[:, 1] < 0).any() or (px[:, 0] > W).any() or (px[:, 1] > H).any():
+        raise ValueError(f"a GCP pixel position is outside the image ({W}x{H} px)")
+    lats = [g[2] for g in gcps]
+    lons = [g[3] for g in gcps]
+    if max(abs(v) for v in lats) > 84:
+        raise ValueError("a GCP latitude is beyond 84 degrees: are latitude and longitude "
+                         "swapped? Enter them as x_px, y_px, lat, lon (Google Maps shows lat first)")
+    zone = int((np.mean(lons) + 180) // 6) + 1
+    epsg = (32600 if np.mean(lats) >= 0 else 32700) + zone
+    xs, ys = warp("EPSG:4326", f"EPSG:{epsg}", lons, lats)
+    A = np.c_[px, np.ones(len(gcps))]
+    # points spread out? (collinear points cannot define an affine)
+    if np.linalg.matrix_rank(A, tol=1e-6 * max(W, H)) < 3:
+        raise ValueError("the GCPs are on one line: pick points spread around the image")
+    cx, rx, _, _ = np.linalg.lstsq(A, np.array(xs), rcond=None)
+    cy, ry, _, _ = np.linalg.lstsq(A, np.array(ys), rcond=None)
+    tr = Affine(cx[0], cx[1], cx[2], cy[0], cy[1], cy[2])
+    gsd = float(np.sqrt(abs(tr.a * tr.e - tr.b * tr.d)))
+    if not 0.02 <= gsd <= 100:
+        raise ValueError(f"these GCPs give a pixel size of {gsd:.3g} m, which is not plausible: "
+                         "check each point (lat/lon swapped, or a pixel position mistyped)")
+    res = np.hypot(A @ cx - xs, A @ cy - ys)
+    rms = float(np.sqrt((res ** 2).mean())) if len(gcps) >= 4 else None
+    prof = dict(driver="GTiff", width=W, height=H, count=3, dtype="uint8",
+                crs=f"EPSG:{epsg}", transform=tr, compress="deflate")
+    with rasterio.open(out_tif, "w", **prof) as d:
+        d.write(np.transpose(rgb, (2, 0, 1)))
+        d.update_tags(GEOREFERENCED_FROM="ground control points", N_GCPS=len(gcps),
+                      SOURCE_IMAGE=os.path.basename(path))
+    info = {"n_gcps": len(gcps), "crs": f"EPSG:{epsg}", "gsd_m": round(gsd, 4),
+            "rms_m": None if rms is None else round(rms, 2), "file": out_tif}
+    print(f"[gcp] {len(gcps)} points -> EPSG:{epsg}, pixel size {gsd:.3f} m"
+          + ("" if rms is None else f", fit error {rms:.2f} m RMS")
+          + ("  (3 points fit exactly: add a 4th to check accuracy)" if rms is None else ""))
+    if rms is not None and rms > max(5.0, 10 * gsd):
+        print(f"[gcp] !! fit error {rms:.1f} m is large: a point may be wrong "
+              "(lat/lon swapped, or a pixel position mistyped)")
+    return info
+
+
+# ==========================================================================
 # pipeline
 # ==========================================================================
 # per-model inference settings - the SAME ones the GAMUS test numbers used
@@ -486,13 +561,24 @@ def get_backend(name, ckpt=None, synrs3d_dir="SynRS3D", head=None):
 def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
         model_gsd=None, tta=True, tile=None,
         dem=None, export=None, name=None, ckpt=None, synrs3d_dir="SynRS3D",
-        source_note=None, head=None, label=None, buildings=True):
+        source_note=None, head=None, label=None, buildings=True,
+        gcps=None, gsd_unknown=False):
     cfg = BACKENDS.get(backend, BACKENDS["rs3dada"])
     model_gsd = model_gsd or cfg["model_gsd"]
     tile = tile or cfg["tile"]
     t0 = time.time()
     os.makedirs(out, exist_ok=True)
+    georef_info = None
+    if gcps:
+        if image.lower().split("?")[0].endswith((".tif", ".tiff")):
+            print("[gcp] the input is already a GeoTIFF: ground control points ignored")
+        else:
+            georef_info = georeference_image(image, gcps if isinstance(gcps, list) else
+                                             parse_gcps(gcps),
+                                             os.path.join(out, "georeferenced.tif"))
+            image = georef_info["file"]
     img = read_image(image, window)
+    scale_known = True
     rgb, valid = img["rgb"], img["valid"]
     H, W = rgb.shape[:2]
     if img["georef"]:
@@ -503,10 +589,16 @@ def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
         print(f"[image] {W}x{H} px, CRS {img['crs'].to_string()}, "
               f"GSD {in_gsd:.4f} m (from the file's transform)")
     else:
-        if not gsd:
-            raise SystemExit("PNG/JPG has no georeference: pass --gsd <metres per pixel>")
-        in_gsd = gsd
-        print(f"[image] {W}x{H} px, NO georeference, GSD {in_gsd} m (from --gsd)")
+        if gsd:
+            in_gsd = gsd
+            print(f"[image] {W}x{H} px, NO georeference, GSD {in_gsd} m (from --gsd)")
+        elif gsd_unknown:
+            in_gsd, scale_known = model_gsd, False
+            print(f"[image] {W}x{H} px, NO georeference, pixel size UNKNOWN: assuming "
+                  f"{in_gsd} m. Output = relative shape only, not metres.")
+        else:
+            raise SystemExit("PNG/JPG has no georeference: pass --gsd <metres per pixel>, "
+                             "--gsd-unknown, or 3+ ground control points (--gcp)")
 
     fn = fn or get_backend(backend, ckpt, synrs3d_dir, head)
     t1 = time.time()
@@ -523,6 +615,7 @@ def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
         base_tags["IMAGE_CREDIT"] = source_note
     name = name or os.path.splitext(os.path.basename(image.split("?")[0]))[0]
     report = {"image": image, "window": window, "size_px": [W, H],
+              "georeferenced_from_gcps": georef_info, "scale_known": scale_known,
               "gsd_m": round(in_gsd, 4), "model": base_tags["MODEL"],
               "model_gsd_m": model_gsd, "tta": tta, "image_credit": source_note}
 
@@ -558,21 +651,27 @@ def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
     else:
         from PIL import Image
         write_tif(os.path.join(out, "ndsm.tif"), ndsm, None,
-                  _identity(in_gsd), dict(base_tags, PRODUCT="nDSM (m), no georeference"))
+                  _identity(in_gsd), dict(base_tags, PRODUCT=(
+                      "nDSM (m), no georeference" if scale_known else
+                      "RELATIVE heights: pixel size unknown, values assume "
+                      f"{in_gsd} m/px and are not reliable metres")))
         v = ndsm[np.isfinite(ndsm)]
         lo, hi = (np.percentile(v, [0.5, 99.5]) if v.size else (0, 1))
         rd = np.clip((np.nan_to_num(ndsm, nan=lo) - lo) / max(hi - lo, 1e-6), 0, 1)
         np.save(os.path.join(out, "rdsm_0to1.npy"), rd.astype(np.float32))
         Image.fromarray((rd * 255).astype(np.uint8)).save(os.path.join(out, "rdsm_0to1.png"))
-        report.update(kind="rdsm", note=("No georeference, so no DEM: ndsm.tif is "
+        report.update(kind="rdsm", note=(("No georeference, so no DEM: ndsm.tif is "
                       "height above local ground in metres (valid only if --gsd is "
-                      "right); rdsm_0to1 is the same surface scaled to 0-1."),
+                      "right); rdsm_0to1 is the same surface scaled to 0-1.") if scale_known else
+                      ("No georeference and unknown pixel size: only the relative shape "
+                       "(rdsm_0to1) is meaningful; ndsm.tif values are not metres.")),
                       sanity=sanity(ndsm, None, None, valid, in_gsd),
                       files=["ndsm.tif", "rdsm_0to1.png", "rdsm_0to1.npy"])
         surf, kind = ndsm, "rdsm"
 
     if export:
-        extra = {"image_credit": source_note, "model": base_tags["MODEL"]}
+        extra = {"image_credit": source_note, "model": base_tags["MODEL"],
+                 "scale_known": scale_known}
         if kind == "dsm":
             extra.update(dem_credit=report["dem_credit"], caveat=report["caveat"],
                          vertical_datum=report["vertical_datum"])
@@ -606,6 +705,13 @@ def write_summary(out, r):
          f"({r['size_px'][0]*r['gsd_m']:.0f} x {r['size_px'][1]*r['gsd_m']:.0f} m)",
          f"Model      : {r['model']}",
          f"Output     : {r['kind'].upper()}  ({', '.join(r['files'])})",
+         *([f"Georef    : from {r['georeferenced_from_gcps']['n_gcps']} ground control points, "
+            f"{r['georeferenced_from_gcps']['crs']}, fit error "
+            + (f"{r['georeferenced_from_gcps']['rms_m']} m RMS"
+               if r['georeferenced_from_gcps']['rms_m'] is not None else "n/a (3 points fit exactly)")]
+           if r.get("georeferenced_from_gcps") else []),
+         *(["SCALE      : pixel size UNKNOWN - heights below are relative, NOT metres"]
+           if r.get("scale_known") is False else []),
          "",
          "Heights above ground predicted by the model (nDSM):",
          f"  half of the area is below {pc.get('50')} m, 95 % below {pc.get('95')} m, "
@@ -714,6 +820,11 @@ def main():
     ap.add_argument("--gsd", type=float, default=None,
                     help="metres/pixel; REQUIRED for PNG/JPG, ignored-with-warning "
                          "for GeoTIFFs unless it differs")
+    ap.add_argument("--gsd-unknown", action="store_true",
+                    help="PNG/JPG with unknown pixel size: relative shape only (0-1), no metres")
+    ap.add_argument("--gcp", action="append", default=None, metavar="X,Y,LAT,LON",
+                    help="ground control point for a PNG/JPG: pixel column,row and its "
+                         "latitude,longitude; give 3 or more to get a full absolute DSM")
     ap.add_argument("--dem", nargs="*", default=None,
                     help="local DEM GeoTIFF(s) instead of fetching Copernicus GLO-30")
     ap.add_argument("--backend", choices=list(BACKENDS), default="rs3dada",
@@ -764,7 +875,9 @@ def main():
               model_gsd=a.model_gsd, tta=not a.no_tta, tile=a.tile, dem=dem,
               export=a.export or None, name=name, ckpt=a.ckpt,
               synrs3d_dir=a.synrs3d_dir, source_note=credit, head=a.head, label=label,
-              buildings=not a.no_buildings)
+              buildings=not a.no_buildings,
+              gcps=parse_gcps(";".join(a.gcp)) if a.gcp else None,
+              gsd_unknown=a.gsd_unknown)
     print(f"[saved] plain-English numbers: {os.path.abspath(os.path.join(out, 'SUMMARY.txt'))}")
     if not a.no_zip:
         zip_results(out.rstrip("/\\") + "_results.zip", out, a.export,
