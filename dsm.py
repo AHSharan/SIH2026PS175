@@ -394,7 +394,7 @@ def export_viewer(out_dir, name, rgb, surf, gsd, kind, meta_extra, max_px=1024,
             "source": "prediction", "kind": kind, "has_reference": False,
             "tile_id": name,
             # terrain scenes open at true scale; 2x makes hills look like cliffs
-            "vex_default": 1.0 if kind == "dsm" else 2.0}
+            "vex_default": 1.0 if kind in ("dsm", "rdsm") else 2.0}
     meta.update(extra)
     meta.update(meta_extra)
     with open(os.path.join(out_dir, f"{name}_meta.json"), "w", encoding="utf-8") as f:

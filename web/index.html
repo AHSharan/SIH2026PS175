@@ -426,15 +426,21 @@ varying float vWorldY;
     sh.fragmentShader=`varying float vWall;
 varying float vWorldY;
 uniform float uHMax;
+uniform float uTint;
 ` + sh.fragmentShader.replace('#include <map_fragment>',
         `#include <map_fragment>
   // facades: darker near the ground, lighter toward the roofline, so a wall
   // reads as a wall instead of a flat blown-out slab
   float hfrac = clamp(vWorldY / max(uHMax, 1.0), 0.0, 1.0);
-  vec3 facade = mix(vec3(0.17,0.18,0.21), vec3(0.42,0.43,0.47), hfrac);
-  diffuseColor.rgb = mix(diffuseColor.rgb, facade, clamp(vWall,0.0,1.0));`);
+  vec3 grey = mix(vec3(0.17,0.18,0.21), vec3(0.42,0.43,0.47), hfrac);
+  // model predictions are smooth bumps, not sharp LiDAR walls: flat grey
+  // turned every house and tree into a grey cone. Keep the photo's own
+  // colour, darkened, so the scene still reads as the real place.
+  vec3 tinted = diffuseColor.rgb * mix(0.55, 0.85, hfrac);
+  diffuseColor.rgb = mix(diffuseColor.rgb, mix(grey, tinted, uTint), clamp(vWall,0.0,1.0));`);
     sh.uniforms.uHMax={value:(!S?40.0:(S.hag?(S.meta.ndsm_p99||10)*vex
                                             :(S.meta.h_p99-base())*vex))};
+    sh.uniforms.uTint={value:(S&&S.meta.source==='prediction'&&surf!=='ref')?1.0:0.0};
     mat.userData.sh=sh;
   };
   mat.customProgramCacheKey=()=>'wall';

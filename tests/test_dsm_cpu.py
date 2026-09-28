@@ -164,8 +164,8 @@ def main():
               json.load(open(os.path.join(tmp, "v3", "p_meta.json")))["kind"] == "rdsm")
 
         p_meta = json.load(open(os.path.join(tmp, "v3", "p_meta.json")))
-        check("rDSM scene: no nDSM layer, 2.0x", not p_meta.get("has_ndsm")
-              and p_meta.get("vex_default") == 2.0)
+        check("rDSM scene: no nDSM layer, 1.0x (true scale)", not p_meta.get("has_ndsm")
+              and p_meta.get("vex_default") == 1.0)
 
         # ---- 4b. --model ours preset (no weights here: check the wiring and
         # the messages a teammate would see)
