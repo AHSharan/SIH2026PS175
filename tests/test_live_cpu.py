@@ -91,6 +91,8 @@ def main():
             check("wrong file type rejected", code == 400 and "unsupported" in r["error"])
             code, r = http("POST", base + "/api/run?name=x.png&model=demo", b"hi")
             check("PNG without pixel size rejected", code == 400 and "pixel size" in r["error"])
+            code, r = http("POST", base + "/api/run?name=x.png&model=demo&gcps=1,2,27.6,88.6", b"hi")
+            check("PNG with < 3 map points rejected", code == 400 and "at least 3" in r["error"])
             code, r = http("POST", base + "/api/run?name=x.png&model=nope&gsd=0.3", b"hi")
             check("unknown model rejected up front", code == 400 and "unknown model" in r["error"])
 

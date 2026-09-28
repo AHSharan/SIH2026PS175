@@ -133,6 +133,14 @@
   <div id="lv-gsd-row" style="display:none">
     <label for="lv-gsd">Pixel size (m) - PNG/JPG only</label>
     <input type="number" id="lv-gsd" min="0.05" max="5" step="0.05" value="0.5">
+    <label style="display:flex;gap:6px;align-items:center;margin-top:6px">
+      <input type="checkbox" id="lv-unk" style="width:auto"> I don't know the pixel size</label>
+    <label for="lv-gcp">Map points (optional, 3 or more)</label>
+    <textarea id="lv-gcp" rows="3" placeholder="x_px, y_px, lat, lon&#10;one point per line"
+      style="width:100%;font:11px ui-monospace,monospace;color:var(--fg);background:#1b2434;
+      border:1px solid var(--line);border-radius:6px;padding:5px;resize:vertical"></textarea>
+    <div class="note">With 3+ points (pixel position from Paint, lat/lon from Google
+      Maps) the image is placed on the map: full elevation above sea level.</div>
   </div>
   <button id="lv-run" style="margin-top:8px">Run</button>
   <div class="bar"><i id="lv-bar"></i></div>
@@ -530,6 +538,8 @@ async function loadScene(name){
   buildMesh();
   frameScene();
   $('loading').style.display='none';
+  if(meta.scale_known===false)
+    toast('Pixel size unknown: this is the relative shape only. Heights and distances are not real metres.',6000);
 }
 
 function frameScene(){
@@ -681,7 +691,8 @@ function setBadge(){
   const m=S.meta, b=$('srcbadge');
   let cls='gt', txt='GROUND TRUTH (no model yet)';
   if(m.kind==='dsm'){cls='pred';txt='DSM = DEM + MODEL nDSM';}
-  else if(m.kind==='rdsm'){cls='pred';txt='RELATIVE DSM (no georeference)';}
+  else if(m.kind==='rdsm'){cls='pred';txt=m.scale_known===false?
+    'RELATIVE SHAPE (pixel size unknown)':'RELATIVE DSM (no georeference)';}
   else if(m.source==='prediction'){
     if(surf==='ref'){cls='gt';txt='LIDAR TRUTH (reference)';}
     else {cls='pred';txt='MODEL PREDICTION';}
@@ -1054,6 +1065,7 @@ async function initLive(){
     (env.hf_token?'':' · HF_TOKEN not set: DINOv3 models will fail');
   $('lv-file').onchange=()=>{const f=$('lv-file').files[0];
     $('lv-gsd-row').style.display=f&&/\.(png|jpe?g)$/i.test(f.name)?'block':'none';};
+  $('lv-unk').onchange=()=>{$('lv-gsd').disabled=$('lv-unk').checked;};
   $('lv-run').onclick=runLive;
 }
 const LV_STEPS=['queued','loading model','reading image','predicting heights','adding terrain',
@@ -1062,7 +1074,12 @@ async function runLive(){
   const f=$('lv-file').files[0]; if(!f){toast('Choose an image first');return;}
   const isPix=/\.(png|jpe?g)$/i.test(f.name);
   const q=new URLSearchParams({name:f.name,model:$('lv-model').value});
-  if(isPix)q.set('gsd',$('lv-gsd').value);
+  if(isPix){
+    const g=$('lv-gcp').value.trim();
+    if(g) q.set('gcps',g.split(/\n+/).map(x=>x.trim()).filter(Boolean).join(';'));
+    else if($('lv-unk').checked) q.set('gsd_unknown','1');
+    else q.set('gsd',$('lv-gsd').value);
+  }
   $('lv-run').disabled=true; $('lv-log').textContent=''; $('lv-bar').style.width='3%';
   $('lv-st').textContent='Uploading '+(f.size/1e6).toFixed(1)+' MB…';
   let r;
