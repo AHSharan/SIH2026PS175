@@ -1,0 +1,291 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1215" viewBox="0 0 1800 1215" font-family="Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1d2533"/></marker></defs>
+<rect width="1800" height="1215" fill="#ffffff"/>
+<text x="30" y="44" font-size="26" font-weight="800" fill="#1d2533">DepthWizard — system architecture</text>
+<text x="30" y="70" font-size="14.5" fill="#5a6679">One optical RGB image → height above ground (nDSM, metres) → absolute DSM GeoTIFF (DSM = DEM + nDSM) → interactive 3D. Numbered circles = processing order.</text>
+<rect x="30" y="90" width="1350" height="260" rx="14" fill="#eef4ff" stroke="#3b6fd8" stroke-width="1.6"/>
+<rect x="30" y="90" width="7" height="260" rx="3" fill="#3b6fd8"/>
+<text x="52" y="120" font-size="18" font-weight="800" fill="#3b6fd8">A · Training (offline, once)</text>
+<text x="52" y="140" font-size="12.5" fill="#5a6679">Frozen satellite foundation model + small trained height head. Model selection on validation only.</text>
+<rect x="52" y="160" width="200" height="170" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="70" cy="180" r="12" fill="#3b6fd8"/>
+<text x="70" y="184.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">A1</text>
+<text x="90" y="185" font-size="15" font-weight="700" fill="#1d2533">GAMUS dataset</text>
+<text x="66" y="208" font-size="12.5" font-weight="400" fill="#5a6679">US aerial RGB + LiDAR nDSM</text>
+<text x="66" y="225" font-size="12.5" font-weight="400" fill="#5a6679">+ land-cover labels</text>
+<text x="66" y="242" font-size="12.5" font-weight="400" fill="#5a6679">1024 × 1024 px @ 0.3 m</text>
+<text x="66" y="259" font-size="12.5" font-weight="700" fill="#1d2533">Used: 1,500 train</text>
+<text x="66" y="276" font-size="12.5" font-weight="700" fill="#1d2533">48 val · 40 test (held out)</text>
+<text x="66" y="293" font-size="12.5" font-weight="400" fill="#5a6679">CC BY 4.0</text>
+<rect x="277" y="160" width="200" height="170" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="295" cy="180" r="12" fill="#3b6fd8"/>
+<text x="295" y="184.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">A2</text>
+<text x="315" y="185" font-size="15" font-weight="700" fill="#1d2533">Scale normalise</text>
+<text x="291" y="208" font-size="12.5" font-weight="400" fill="#5a6679">0.3 m → 0.5 m per pixel</text>
+<text x="291" y="225" font-size="12.5" font-weight="400" fill="#5a6679">1024 → 608 px</text>
+<text x="291" y="242" font-size="12.5" font-weight="400" fill="#5a6679">= 38 × 38 patches of 16 px</text>
+<text x="291" y="259" font-size="12.5" font-weight="400" fill="#5a6679">same resampling as</text>
+<text x="291" y="276" font-size="12.5" font-weight="400" fill="#5a6679">inference (checked)</text>
+<rect x="502" y="160" width="200" height="170" rx="9" fill="#dbe8ff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="520" cy="180" r="12" fill="#3b6fd8"/>
+<text x="520" y="184.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">A3</text>
+<text x="540" y="185" font-size="15" font-weight="700" fill="#1d2533">DINOv3 ViT-L/16</text>
+<text x="516" y="208" font-size="12.5" font-weight="400" fill="#5a6679">pre-trained on SAT-493M</text>
+<text x="516" y="225" font-size="12.5" font-weight="400" fill="#5a6679">(493 M satellite images)</text>
+<text x="516" y="242" font-size="12.5" font-weight="700" fill="#1d2533">FROZEN (not trained)</text>
+<text x="516" y="259" font-size="12.5" font-weight="400" fill="#5a6679">features from layers</text>
+<text x="516" y="276" font-size="12.5" font-weight="400" fill="#5a6679">6 · 12 · 18 · 24</text>
+<text x="516" y="293" font-size="12.5" font-weight="400" fill="#5a6679">SAT mean/std normalisation</text>
+<rect x="727" y="160" width="200" height="170" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="745" cy="180" r="12" fill="#3b6fd8"/>
+<text x="745" y="184.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">A4</text>
+<text x="765" y="185" font-size="15" font-weight="700" fill="#1d2533">Feature cache</text>
+<text x="741" y="208" font-size="12.5" font-weight="400" fill="#5a6679">computed once per tile</text>
+<text x="741" y="225" font-size="12.5" font-weight="400" fill="#5a6679">4 × 1024 × 38 × 38</text>
+<text x="741" y="242" font-size="12.5" font-weight="400" fill="#5a6679">fp16 ≈ 12 MB / tile</text>
+<text x="741" y="259" font-size="12.5" font-weight="400" fill="#5a6679">→ training fits a</text>
+<text x="741" y="276" font-size="12.5" font-weight="400" fill="#5a6679">free Colab T4 GPU</text>
+<rect x="952" y="160" width="200" height="170" rx="9" fill="#dbe8ff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="970" cy="180" r="12" fill="#3b6fd8"/>
+<text x="970" y="184.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">A5</text>
+<text x="990" y="185" font-size="15" font-weight="700" fill="#1d2533">DPT height head</text>
+<text x="966" y="208" font-size="12.5" font-weight="700" fill="#1d2533">TRAINED: 12.7 M params</text>
+<text x="966" y="225" font-size="12.5" font-weight="400" fill="#5a6679">4-level reassemble + fuse</text>
+<text x="966" y="242" font-size="12.5" font-weight="400" fill="#5a6679">masked Huber loss (m),</text>
+<text x="966" y="259" font-size="12.5" font-weight="400" fill="#5a6679">target clip 0–150 m</text>
+<text x="966" y="276" font-size="12.5" font-weight="400" fill="#5a6679">AdamW 1e-4, cosine, 30 ep</text>
+<text x="966" y="293" font-size="12.5" font-weight="400" fill="#5a6679">aug: flips + 90° rotations</text>
+<rect x="1177" y="160" width="200" height="170" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="1195" cy="180" r="12" fill="#3b6fd8"/>
+<text x="1195" y="184.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">A6</text>
+<text x="1215" y="185" font-size="15" font-weight="700" fill="#1d2533">best.pt</text>
+<text x="1191" y="208" font-size="12.5" font-weight="400" fill="#5a6679">checkpoint with lowest</text>
+<text x="1191" y="225" font-size="12.5" font-weight="700" fill="#1d2533">validation RMSE</text>
+<text x="1191" y="242" font-size="12.5" font-weight="400" fill="#5a6679">(test tiles never used</text>
+<text x="1191" y="259" font-size="12.5" font-weight="400" fill="#5a6679">for selection)</text>
+<text x="1191" y="276" font-size="12.5" font-weight="400" fill="#5a6679">→ best_1500.pt</text>
+<path d="M252,245.0 L274,245.0" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M477,245.0 L499,245.0" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M702,245.0 L724,245.0" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M927,245.0 L949,245.0" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M1152,245.0 L1174,245.0" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<rect x="30" y="370" width="1350" height="520" rx="14" fill="#ecfaf3" stroke="#1f9d63" stroke-width="1.6"/>
+<rect x="30" y="370" width="7" height="520" rx="3" fill="#1f9d63"/>
+<text x="52" y="400" font-size="18" font-weight="800" fill="#1f9d63">B · Inference — dsm.py (one command: python dsm.py --model ours)</text>
+<text x="52" y="420" font-size="12.5" fill="#5a6679">Any georeferenced image in, standard GeoTIFF DSM out. Runs on a laptop GPU.</text>
+<rect x="52" y="440" width="230" height="190" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="70" cy="460" r="12" fill="#1f9d63"/>
+<text x="70" y="464.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">1</text>
+<text x="90" y="465" font-size="15" font-weight="700" fill="#1d2533">Input image</text>
+<text x="66" y="488" font-size="12.5" font-weight="400" fill="#5a6679">GeoTIFF (any CRS) or</text>
+<text x="66" y="505" font-size="12.5" font-weight="400" fill="#5a6679">PNG / JPG (+ --gsd)</text>
+<text x="66" y="522" font-size="12.5" font-weight="400" fill="#5a6679"></text>
+<text x="66" y="539" font-size="12.5" font-weight="700" fill="#1d2533">Demo: Chungthang, Sikkim</text>
+<text x="66" y="556" font-size="12.5" font-weight="400" fill="#5a6679">WorldView-2, 0.305 m px</text>
+<text x="66" y="573" font-size="12.5" font-weight="400" fill="#5a6679">2048 × 2048 px = 625 × 625 m</text>
+<text x="66" y="590" font-size="12.5" font-weight="400" fill="#5a6679">Maxar Open Data, CC BY-NC</text>
+<rect x="307" y="440" width="230" height="190" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="325" cy="460" r="12" fill="#1f9d63"/>
+<text x="325" y="464.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">2</text>
+<text x="345" y="465" font-size="15" font-weight="700" fill="#1d2533">Georeference</text>
+<text x="321" y="488" font-size="12.5" font-weight="400" fill="#5a6679">CRS + transform preserved</text>
+<text x="321" y="505" font-size="12.5" font-weight="400" fill="#5a6679">pixel size (GSD) read from</text>
+<text x="321" y="522" font-size="12.5" font-weight="400" fill="#5a6679">the file; degrees → metres</text>
+<text x="321" y="539" font-size="12.5" font-weight="400" fill="#5a6679">scene-fill mask (edge black)</text>
+<text x="321" y="556" font-size="12.5" font-weight="400" fill="#5a6679"></text>
+<text x="321" y="573" font-size="12.5" font-weight="400" fill="#5a6679">no CRS (PNG/JPG) →</text>
+<text x="321" y="590" font-size="12.5" font-weight="400" fill="#5a6679">relative DSM 0–1 path</text>
+<rect x="562" y="440" width="210" height="190" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="580" cy="460" r="12" fill="#1f9d63"/>
+<text x="580" y="464.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">3</text>
+<text x="600" y="465" font-size="15" font-weight="700" fill="#1d2533">Scale normalise</text>
+<text x="576" y="488" font-size="12.5" font-weight="400" fill="#5a6679">resample to the model's</text>
+<text x="576" y="505" font-size="12.5" font-weight="400" fill="#5a6679">training scale: 0.5 m</text>
+<text x="576" y="522" font-size="12.5" font-weight="400" fill="#5a6679"></text>
+<text x="576" y="539" font-size="12.5" font-weight="400" fill="#5a6679">Chungthang:</text>
+<text x="576" y="556" font-size="12.5" font-weight="400" fill="#5a6679">2048 → 1246 px</text>
+<text x="576" y="573" font-size="12.5" font-weight="400" fill="#5a6679">(0.305 → 0.5 m)</text>
+<rect x="797" y="440" width="561" height="190" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="815" cy="460" r="12" fill="#1f9d63"/>
+<text x="815" y="464.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">4</text>
+<text x="835" y="465" font-size="15" font-weight="700" fill="#1d2533">Height model (nDSM, metres)</text>
+<text x="811" y="488" font-size="12" font-weight="400" fill="#5a6679">tiles + 25% overlap · Gaussian-feathered blend · 3-way flip TTA ·</text>
+<text x="811" y="505" font-size="12" font-weight="400" fill="#5a6679">resample back to input grid · clamp ≥ 0 m</text>
+<rect x="811" y="528" width="259" height="90" rx="9" fill="#dbe8ff" stroke="#3b6fd8" stroke-width="1.4"/>
+<text x="825" y="553" font-size="13" font-weight="700" fill="#1d2533">OURS  (--model ours)</text>
+<text x="825" y="576" font-size="11.5" font-weight="400" fill="#5a6679">DINOv3-SAT + trained head</text>
+<text x="825" y="591" font-size="11.5" font-weight="400" fill="#5a6679">tile 608 px · patch 16</text>
+<text x="825" y="606" font-size="11.5" font-weight="400" fill="#5a6679">weights: best_1500.pt</text>
+<rect x="1084" y="528" width="259" height="90" rx="9" fill="#f4f6f9" stroke="#8a96a8" stroke-width="1.4"/>
+<text x="1098" y="553" font-size="13" font-weight="700" fill="#1d2533">Baseline (default)</text>
+<text x="1098" y="576" font-size="11.5" font-weight="400" fill="#5a6679">RS3DAda (SynRS3D, MIT)</text>
+<text x="1098" y="591" font-size="11.5" font-weight="400" fill="#5a6679">ViT-L + DPT · tile 1022 · patch 14</text>
+<text x="1098" y="606" font-size="11.5" font-weight="400" fill="#5a6679">public weights, no login</text>
+<path d="M282,535.0 L304,535.0" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M537,535.0 L559,535.0" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M772,535.0 L794,535.0" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M1277.0,330 L1277.0,510 L940.5,510 L940.5,525" fill="none" stroke="#3b6fd8" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="1285.0" y="352" font-size="11.5" fill="#5a6679" font-style="italic">trained weights</text>
+<rect x="52" y="675" width="300" height="170" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="70" cy="695" r="12" fill="#1f9d63"/>
+<text x="70" y="699.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">5</text>
+<text x="90" y="700" font-size="15" font-weight="700" fill="#1d2533">Terrain (DEM)</text>
+<text x="66" y="723" font-size="12.5" font-weight="400" fill="#5a6679">Copernicus GLO-30 (auto-fetched</text>
+<text x="66" y="740" font-size="12.5" font-weight="400" fill="#5a6679">for the image footprint)</text>
+<text x="66" y="757" font-size="12.5" font-weight="400" fill="#5a6679">or CartoDEM via --dem</text>
+<text x="66" y="774" font-size="12.5" font-weight="400" fill="#5a6679">bilinear reprojection to the</text>
+<text x="66" y="791" font-size="12.5" font-weight="400" fill="#5a6679">image grid · heights: EGM2008</text>
+<text x="66" y="808" font-size="12.5" font-weight="400" fill="#5a6679">Chungthang: 1549–1770 m</text>
+<rect x="377" y="675" width="205" height="170" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="395" cy="695" r="12" fill="#1f9d63"/>
+<text x="395" y="699.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">6</text>
+<text x="415" y="700" font-size="15" font-weight="700" fill="#1d2533">Compose</text>
+<text x="391" y="723" font-size="12.5" font-weight="700" fill="#1d2533">DSM = DEM + nDSM</text>
+<text x="391" y="740" font-size="12.5" font-weight="400" fill="#5a6679">metres above sea level</text>
+<text x="391" y="757" font-size="12.5" font-weight="400" fill="#5a6679">(EGM2008 geoid)</text>
+<text x="391" y="774" font-size="12.5" font-weight="400" fill="#5a6679"></text>
+<text x="391" y="791" font-size="12.5" font-weight="400" fill="#5a6679">caveat: 30 m DEM already</text>
+<text x="391" y="808" font-size="12.5" font-weight="400" fill="#5a6679">holds smoothed objects</text>
+<rect x="607" y="675" width="330" height="170" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="625" cy="695" r="12" fill="#1f9d63"/>
+<text x="625" y="699.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">7</text>
+<text x="645" y="700" font-size="15" font-weight="700" fill="#1d2533">Outputs (standard formats)</text>
+<text x="621" y="723" font-size="12.5" font-weight="700" fill="#1d2533">dsm.tif · ndsm.tif · dem.tif</text>
+<text x="621" y="740" font-size="12.5" font-weight="400" fill="#5a6679">GeoTIFF float32 · LZW · nodata −9999</text>
+<text x="621" y="757" font-size="12.5" font-weight="400" fill="#5a6679">same CRS &amp; grid as the input image</text>
+<text x="621" y="774" font-size="12.5" font-weight="400" fill="#5a6679">report.json (provenance + checks)</text>
+<text x="621" y="791" font-size="12.5" font-weight="400" fill="#5a6679">SUMMARY.txt · one shareable .zip</text>
+<text x="621" y="808" font-size="12.5" font-weight="400" fill="#5a6679">viewer assets → C</text>
+<rect x="962" y="675" width="396" height="170" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="980" cy="695" r="12" fill="#1f9d63"/>
+<text x="980" y="699.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">8</text>
+<text x="1000" y="700" font-size="15" font-weight="700" fill="#1d2533">Checks + buildings</text>
+<text x="976" y="723" font-size="12.5" font-weight="400" fill="#5a6679">no ground truth needed:</text>
+<text x="976" y="740" font-size="12.5" font-weight="400" fill="#5a6679">height percentiles, &gt; 80 m flag,</text>
+<text x="976" y="757" font-size="12.5" font-weight="400" fill="#5a6679">DEM coverage, 30 m double-count</text>
+<text x="976" y="774" font-size="12.5" font-weight="400" fill="#5a6679">building finder: nDSM ≥ 2.5 m,</text>
+<text x="976" y="791" font-size="12.5" font-weight="400" fill="#5a6679">trees removed (colour + texture),</text>
+<text x="976" y="808" font-size="12.5" font-weight="400" fill="#5a6679">20–5000 m², floors = h ÷ 3 m</text>
+<path d="M329,630 L329,672" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="337" y="656" font-size="11.5" fill="#5a6679" font-style="italic">footprint + grid</text>
+<path d="M857,630 L857,652 L479.5,652 L479.5,672" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="487.5" y="668" font-size="11.5" fill="#5a6679" font-style="italic">nDSM</text>
+<path d="M352,760.0 L374,760.0" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M582,760.0 L604,760.0" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M937,760.0 L959,760.0" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<rect x="30" y="910" width="1350" height="235" rx="14" fill="#fff5e8" stroke="#d9822b" stroke-width="1.6"/>
+<rect x="30" y="910" width="7" height="235" rx="3" fill="#d9822b"/>
+<text x="52" y="940" font-size="18" font-weight="800" fill="#d9822b">C · Visualisation — Three.js viewer (any browser, python serve.py)</text>
+<text x="52" y="960" font-size="12.5" fill="#5a6679">Loads step 7's assets: 1024² float32 height grid, nDSM layer, ≤ 2048 px texture, building list.</text>
+<rect x="52" y="982" width="250" height="145" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="70" cy="1002" r="12" fill="#d9822b"/>
+<text x="70" y="1006.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">C1</text>
+<text x="90" y="1007" font-size="15" font-weight="700" fill="#1d2533">3D terrain</text>
+<text x="66" y="1030" font-size="12.5" font-weight="400" fill="#5a6679">1.05 M-vertex mesh (1024²)</text>
+<text x="66" y="1047" font-size="12.5" font-weight="400" fill="#5a6679">image draped exactly (ortho)</text>
+<text x="66" y="1064" font-size="12.5" font-weight="400" fill="#5a6679">walls detected from nDSM</text>
+<text x="66" y="1081" font-size="12.5" font-weight="400" fill="#5a6679">(hillsides stay photo-real)</text>
+<text x="66" y="1098" font-size="12.5" font-weight="400" fill="#5a6679">true scale 1.0× for DSM</text>
+<text x="66" y="1115" font-size="12.5" font-weight="400" fill="#5a6679">adjustable sun + shadows</text>
+<rect x="319" y="982" width="250" height="145" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="337" cy="1002" r="12" fill="#d9822b"/>
+<text x="337" y="1006.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">C2</text>
+<text x="357" y="1007" font-size="15" font-weight="700" fill="#1d2533">Navigate</text>
+<text x="333" y="1030" font-size="12.5" font-weight="400" fill="#5a6679">fly (W A S D, Q E) with</text>
+<text x="333" y="1047" font-size="12.5" font-weight="400" fill="#5a6679">terrain collision</text>
+<text x="333" y="1064" font-size="12.5" font-weight="400" fill="#5a6679">orbit + zoom</text>
+<text x="333" y="1081" font-size="12.5" font-weight="400" fill="#5a6679">scripted 24 s tour</text>
+<text x="333" y="1098" font-size="12.5" font-weight="400" fill="#5a6679">→ record MP4/WebM video</text>
+<rect x="586" y="982" width="250" height="145" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="604" cy="1002" r="12" fill="#d9822b"/>
+<text x="604" y="1006.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">C3</text>
+<text x="624" y="1007" font-size="15" font-weight="700" fill="#1d2533">Analyse</text>
+<text x="600" y="1030" font-size="12.5" font-weight="400" fill="#5a6679">probe: elevation, height</text>
+<text x="600" y="1047" font-size="12.5" font-weight="400" fill="#5a6679">above ground, slope, floors</text>
+<text x="600" y="1064" font-size="12.5" font-weight="400" fill="#5a6679">measure: distance, Δheight</text>
+<text x="600" y="1081" font-size="12.5" font-weight="400" fill="#5a6679">+ height-profile chart</text>
+<text x="600" y="1098" font-size="12.5" font-weight="400" fill="#5a6679">overlays: height · slope · error</text>
+<rect x="853" y="982" width="250" height="145" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4"/>
+<circle cx="871" cy="1002" r="12" fill="#d9822b"/>
+<text x="871" y="1006.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">C4</text>
+<text x="891" y="1007" font-size="15" font-weight="700" fill="#1d2533">Validate (GAMUS tiles)</text>
+<text x="867" y="1030" font-size="12.5" font-weight="400" fill="#5a6679">switch model ↔ LiDAR truth</text>
+<text x="867" y="1047" font-size="12.5" font-weight="400" fill="#5a6679">signed error map</text>
+<text x="867" y="1064" font-size="12.5" font-weight="400" fill="#5a6679">(red too high, blue too low)</text>
+<text x="867" y="1081" font-size="12.5" font-weight="400" fill="#5a6679">live RMSE · MAE · bias</text>
+<text x="867" y="1098" font-size="12.5" font-weight="400" fill="#5a6679">on the loaded tile</text>
+<rect x="1120" y="982" width="250" height="145" rx="9" fill="#fff" stroke="#8a96a8" stroke-width="1.4" stroke-dasharray="6 4"/>
+<circle cx="1138" cy="1002" r="12" fill="#d9822b"/>
+<text x="1138" y="1006.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">C5</text>
+<text x="1158" y="1007" font-size="15" font-weight="700" fill="#1d2533">Tools (optional)</text>
+<text x="1134" y="1030" font-size="12.5" font-weight="400" fill="#5a6679">Flood: water level slider,</text>
+<text x="1134" y="1047" font-size="12.5" font-weight="400" fill="#5a6679">flooded area + buildings hit</text>
+<text x="1134" y="1064" font-size="12.5" font-weight="400" fill="#5a6679">(bathtub screening model)</text>
+<text x="1134" y="1081" font-size="12.5" font-weight="400" fill="#5a6679">Buildings: pins by floors,</text>
+<text x="1134" y="1098" font-size="12.5" font-weight="400" fill="#5a6679">red when flooded</text>
+<path d="M772.0,845 L772.0,907" fill="none" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="780.0" y="859" font-size="11.5" fill="#5a6679" font-style="italic">viewer assets</text>
+<rect x="1400" y="90" width="370" height="1055" rx="14" fill="#f5f3ff" stroke="#6b4fd8" stroke-width="1.6"/>
+<rect x="1400" y="90" width="7" height="1055" rx="3" fill="#6b4fd8"/>
+<text x="1422" y="122" font-size="18" font-weight="800" fill="#6b4fd8" text-anchor="start">D · Measured results</text>
+<text x="1422" y="144" font-size="12" font-weight="400" fill="#5a6679" text-anchor="start">40 held-out GAMUS test tiles, real LiDAR truth</text>
+<text x="1422" y="174" font-size="13.5" font-weight="700" fill="#1d2533" text-anchor="start">Overall error (RMSE, lower = better)</text>
+<text x="1422" y="196" font-size="12.5" fill="#1d2533">Predict zero (floor)</text>
+<rect x="1585" y="184" width="105.0" height="15" rx="3" fill="#c8cdd6"/>
+<text x="1695.0" y="196" font-size="12.5" font-weight="700" fill="#1d2533">9.35 m</text>
+<text x="1422" y="221" font-size="12.5" fill="#1d2533">RS3DAda (NeurIPS 2024)</text>
+<rect x="1585" y="209" width="75.7" height="15" rx="3" fill="#9aa6b8"/>
+<text x="1665.7" y="221" font-size="12.5" font-weight="700" fill="#1d2533">6.74 m</text>
+<text x="1422" y="246" font-size="12.5" fill="#1d2533">Ours, 480 train tiles</text>
+<rect x="1585" y="234" width="55.7" height="15" rx="3" fill="#8fb0ec"/>
+<text x="1645.7" y="246" font-size="12.5" font-weight="700" fill="#1d2533">4.96 m</text>
+<text x="1422" y="271" font-size="12.5" fill="#1d2533">Ours, 1,500 train tiles</text>
+<rect x="1585" y="259" width="52.7" height="15" rx="3" fill="#6b4fd8"/>
+<text x="1642.7" y="271" font-size="12.5" font-weight="700" fill="#1d2533">4.69 m</text>
+<text x="1422" y="298" font-size="12.5" font-weight="700" fill="#1d2533" text-anchor="start">Ours (1,500): MAE 2.29 m · correlation r 0.81</text>
+<text x="1422" y="316" font-size="12.5" font-weight="400" fill="#5a6679" text-anchor="start">86.6% of pixels within 5 m of LiDAR</text>
+<text x="1422" y="346" font-size="13.5" font-weight="700" fill="#1d2533" text-anchor="start">By land type (RMSE)</text>
+<text x="1422" y="368" font-size="12" font-weight="700" fill="#5a6679"></text>
+<text x="1590" y="368" font-size="12" font-weight="700" fill="#5a6679">RS3DAda</text>
+<text x="1680" y="368" font-size="12" font-weight="700" fill="#5a6679">Ours</text>
+<text x="1422" y="388" font-size="12.5" fill="#1d2533">Urban</text>
+<text x="1590" y="388" font-size="12.5" fill="#1d2533">5.11 m</text>
+<text x="1680" y="388" font-size="12.5" font-weight="700" fill="#6b4fd8">4.79 m</text>
+<text x="1422" y="408" font-size="12.5" fill="#1d2533">Sparse</text>
+<text x="1590" y="408" font-size="12.5" fill="#1d2533">2.83 m</text>
+<text x="1680" y="408" font-size="12.5" font-weight="700" fill="#6b4fd8">2.15 m</text>
+<text x="1422" y="428" font-size="12.5" fill="#1d2533">Forest</text>
+<text x="1590" y="428" font-size="12.5" fill="#1d2533">11.87 m</text>
+<text x="1680" y="428" font-size="12.5" font-weight="700" fill="#6b4fd8">6.03 m</text>
+<text x="1422" y="460" font-size="13.5" font-weight="700" fill="#1d2533" text-anchor="start">Input-resolution robustness (ours)</text>
+<text x="1422" y="482" font-size="12.5" font-weight="400" fill="#5a6679" text-anchor="start">0.30 / 0.50 / 0.75 / 1.00 m per pixel</text>
+<text x="1422" y="500" font-size="12.5" font-weight="700" fill="#1d2533" text-anchor="start">RMSE 4.55 / 4.40 / 4.58 / 5.63 m</text>
+<text x="1422" y="530" font-size="13.5" font-weight="700" fill="#1d2533" text-anchor="start">Speed — Chungthang, 625 × 625 m</text>
+<text x="1422" y="552" font-size="12.5" font-weight="400" fill="#5a6679" text-anchor="start">RTX 5060 laptop GPU, end to end:</text>
+<text x="1422" y="570" font-size="12.5" font-weight="700" fill="#1d2533" text-anchor="start">RS3DAda 18.3 s · ours (480) 14.4 s</text>
+<text x="1422" y="600" font-size="13.5" font-weight="700" fill="#1d2533" text-anchor="start">Indian demo — Chungthang (no LiDAR truth)</text>
+<text x="1422" y="622" font-size="12.5" font-weight="400" fill="#5a6679" text-anchor="start">height above ground, 95th percentile:</text>
+<text x="1422" y="640" font-size="12.5" font-weight="700" fill="#1d2533" text-anchor="start">RS3DAda 6.4 m · ours (480) 8.9 m</text>
+<text x="1422" y="658" font-size="12.5" font-weight="400" fill="#5a6679" text-anchor="start">ours predicts taller trees/buildings, the same</text>
+<text x="1422" y="676" font-size="12.5" font-weight="400" fill="#5a6679" text-anchor="start">direction as its fixed forest bias on LiDAR tiles</text>
+<text x="1422" y="694" font-size="12.5" font-weight="400" fill="#5a6679" text-anchor="start">(plausibility, not an accuracy claim)</text>
+<text x="1422" y="724" font-size="13.5" font-weight="700" fill="#1d2533" text-anchor="start">Rigour</text>
+<text x="1422" y="746" font-size="12.5" font-weight="400" fill="#1d2533" text-anchor="start">• same 40 test tiles for every model</text>
+<text x="1422" y="764" font-size="12.5" font-weight="400" fill="#1d2533" text-anchor="start">• model chosen on validation only</text>
+<text x="1422" y="782" font-size="12.5" font-weight="400" fill="#1d2533" text-anchor="start">• harness self-test: 0.13 m noise floor</text>
+<text x="1422" y="800" font-size="12.5" font-weight="400" fill="#1d2533" text-anchor="start">• negative results reported</text>
+<text x="1422" y="830" font-size="13.5" font-weight="700" fill="#b3261e" text-anchor="start">Honest limits</text>
+<text x="1422" y="852" font-size="12.5" font-weight="400" fill="#1d2533" text-anchor="start">• accuracy measured on US aerial data;</text>
+<text x="1422" y="870" font-size="12.5" font-weight="400" fill="#1d2533" text-anchor="start">   Indian imagery has no open LiDAR truth</text>
+<text x="1422" y="888" font-size="12.5" font-weight="400" fill="#1d2533" text-anchor="start">   → Chungthang: plausibility checks only</text>
+<text x="1422" y="906" font-size="12.5" font-weight="400" fill="#1d2533" text-anchor="start">• 30 m DEM partly double-counts objects</text>
+<text x="1422" y="924" font-size="12.5" font-weight="400" fill="#1d2533" text-anchor="start">• flood tool = bathtub screening</text>
+<text x="1422" y="942" font-size="12.5" font-weight="400" fill="#1d2533" text-anchor="start">• building floors are estimates (h ÷ 3 m)</text>
+<line x1="30" y1="1173" x2="70" y2="1173" stroke="#1d2533" stroke-width="1.8" marker-end="url(#ah)"/>
+<text x="80" y="1177" font-size="12.5" fill="#5a6679">data flow</text>
+<rect x="180" y="1164" width="30" height="18" rx="4" fill="#dbe8ff" stroke="#3b6fd8"/>
+<text x="218" y="1177" font-size="12.5" fill="#5a6679">our model components</text>
+<rect x="390" y="1164" width="30" height="18" rx="4" fill="#fff" stroke="#8a96a8" stroke-dasharray="6 4"/>
+<text x="428" y="1177" font-size="12.5" fill="#5a6679">optional (off by default)</text>
+<text x="1770" y="1177" font-size="12" fill="#5a6679" text-anchor="end">Credits: GAMUS (CC BY 4.0) · DINOv3 (Meta) · RS3DAda/SynRS3D (MIT) · Copernicus DEM GLO-30 © DLR/Airbus · imagery © Maxar Open Data (CC BY-NC 4.0) · Three.js (MIT)</text>
+</svg>
