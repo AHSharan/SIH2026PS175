@@ -1,0 +1,70 @@
+DepthWizard — Proprietary Licence (All Rights Reserved)
+
+Copyright (c) 2026 AHSharan and the DepthWizard team. All rights reserved.
+
+This repository is published so it can be viewed. It is NOT open source, and
+no licence to use it is granted except as written below.
+
+1. NO COPYING OR REUSE
+
+   Except as allowed in section 2, you may not copy, reproduce, modify, adapt,
+   translate, merge, publish, distribute, sublicense, sell, rent, host, or
+   create derivative works from this software, its source code, documentation,
+   diagrams, trained model weights, results or any other part of this
+   repository, in whole or in part, for any purpose — commercial or
+   non-commercial, including academic, research, hackathon or competition use —
+   without prior written permission from the copyright holders.
+
+2. EVALUATION PERMISSION
+
+   The organisers of Smart India Hackathon 2026 and the evaluators appointed
+   for problem statement SIH26175 (Indian Space Research Organisation / Space
+   Applications Centre) may view, download, install and run this software
+   solely to evaluate this team's submission. This permission ends when that
+   evaluation ends. It does not include redistribution, modification, reuse
+   in any other work, or any other use.
+
+3. VIEWING ON GITHUB
+
+   Being able to view this repository, or to use GitHub's fork feature as
+   required by the GitHub Terms of Service, does not grant any right to use,
+   copy, modify or distribute its contents beyond what those Terms require.
+
+4. MACHINE LEARNING AND DATASETS
+
+   The contents of this repository may not be used to train, fine-tune,
+   evaluate or benchmark machine-learning models, or be included in any
+   dataset, without prior written permission.
+
+5. THIRD-PARTY MATERIAL KEEPS ITS OWN LICENCE
+
+   Some files contain material owned by others. This licence does not apply to
+   that material and does not change its terms; it applies only to the
+   DepthWizard team's own work, including where our work is combined with it.
+
+   - GAMUS dataset (Xiong et al., arXiv 2305.14914), CC BY 4.0:
+     web/assets/ (GAMUS test tiles) and images rendered from them
+     (shots/0*, shots/test_native.jpg, docs/thumbs/gamus_*).
+   - Maxar Open Data Program imagery, CC BY-NC 4.0 — WorldView-2, 2022-03-07,
+     catalog 10300100CE8D0400: samples/chungthang_wv2.tif and images derived
+     from it (docs/thumbs/india_*, shots/india_*, shots/live_jpg_result.jpg).
+   - Copernicus DEM GLO-30 — (c) DLR e.V. 2010-2014 and (c) Airbus Defence and
+     Space GmbH 2014-2018, provided under COPERNICUS by the European Union and
+     ESA: samples/chungthang_glo30.tif and elevation images derived from it.
+   - The architecture diagrams in docs/ contain images from the sources above.
+
+   Software downloaded at run time is not part of this repository and remains
+   under its own licence: SynRS3D / RS3DAda (MIT), DINOv3 weights (DINOv3
+   License, Meta Platforms), Three.js (MIT), and the Python packages listed in
+   requirements.txt.
+
+6. NO WARRANTY
+
+   This software is provided "as is", without warranty of any kind, express or
+   implied. In no event shall the copyright holders be liable for any claim,
+   damages or other liability arising from the software or its use.
+
+7. PERMISSION REQUESTS
+
+   To ask for permission, contact the repository owner through
+   https://github.com/AHSharan/SIH2026PS175

@@ -1,5 +1,7 @@
 # DepthWizard — SIH 2026 PS 26175 (ISRO / SAC)
 
+> **Proprietary — all rights reserved. No copying or reuse without written permission. See [LICENSE](LICENSE).**
+
 Single-view RGB remote-sensing image → **metric height map (nDSM)** → DSM,
 with an interactive 3D flythrough and an honest evaluation harness.
 
@@ -116,7 +118,14 @@ RS3DAda (`JTRNEO/SynRS3D`, MIT) — ViT-L + DPT, outputs metres, trained on
   `max_pixel_value=1` — **the image is NOT divided by 255 first**
 - patch size 1022 (must be divisible by 14), output key `'regression'`
 
-## Licences
+## Licence
 
-RS3DAda / SynRS3D: MIT · GAMUS: CC-BY-4.0 · DINOv3: Meta custom licence
-(gated) · Three.js: MIT
+**All rights reserved.** This project is proprietary: you may not copy, modify,
+redistribute or reuse any part of it without written permission from the
+copyright holders. SIH 2026 organisers and ISRO/SAC evaluators may run it
+solely to evaluate this submission. See [LICENSE](LICENSE).
+
+Third-party material keeps its own licence (details in LICENSE): GAMUS data
+(CC BY 4.0), Maxar Open Data imagery (CC BY-NC 4.0), Copernicus DEM GLO-30.
+Downloaded at run time, not included: SynRS3D / RS3DAda (MIT), DINOv3 weights
+(DINOv3 License, Meta, gated), Three.js (MIT).
