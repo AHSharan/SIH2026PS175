@@ -3,7 +3,9 @@ docs/make_idea_ppt.py - the SIH 2026 idea deck (6 slides) built on the OFFICIAL
 template. The template's design is kept as is (title style, SIH logo, blue
 footer, slide numbers, title-slide artwork); only its placeholder text is
 replaced and our content is added as native, editable shapes and charts.
-Every number is measured (sources: RESULTS.md, results/lidar_benchmark.md).
+Numbers: 40-tile GAMUS test of the 1,500-tile model (team's Colab run: RMSE 4.69 m,
+MAE 2.29 m, r 0.81) and RS3DAda / predict-0 on the same tiles (RESULTS.md);
+full-pipeline LiDAR results from results/lidar_benchmark.md.
 
     python docs/make_idea_ppt.py --official SIH2026-IDEA-Presentation-Format.pptx
         --team-deck <our earlier deck .pptx, for the ParallaX and SIT logos>
@@ -237,117 +239,136 @@ def slide_solution(s, a):
         "India loses about **USD 7.4 billion a year to floods** alone. [1]",
         "Flood and landslide maps need an elevation model, but today that means **LiDAR, "
         "stereo or radar**: $5k–$100k+ per survey and days of flying. [2]",
-        "AI depth models give only **relative depth** from a photo, not real metres."],
+        "Depth AI trained on street photos gives only **relative depth**, not real metres from above."],
         size=12.5, bullet="▪", space=7)
     section(s, 4.65, 1.32, 4.1, "OUR SOLUTION", BLUE)
     text(s, 4.7, 1.75, 4.1, 2.3, [
-        "**One satellite or aerial image in, a metric elevation model out**: a DSM GeoTIFF "
+        "**One satellite or aerial image in, a measured elevation model out**: a DSM GeoTIFF "
         "and a 3D scene you can fly through.",
-        "Our model reads **height above ground in metres** straight from the photo; a free "
-        "30 m terrain map adds the ground.",
-        "GeoTIFF → absolute DSM · PNG/JPG → relative DSM · 3 map points place a plain image.",
-        "It **checks itself**: drop in LiDAR or any reference and see the error map."],
-        size=12, bullet="▪", space=6)
-    picture(s, os.path.join(a, "hero.jpg"), 8.98, 1.36, 4.0, 2.28)
-    text(s, 8.98, 3.66, 4.0, 0.3, "Our output: Chungthang, Sikkim, from one WorldView-2 image",
+        "Built on DINOv3-SAT [4] and trained on LiDAR heights [3], our model reads "
+        "**height above ground in metres**; a 30 m terrain map adds the ground [7].",
+        "GeoTIFF gives an absolute DSM; PNG/JPG a relative DSM, or a full DSM with 3 map points.",
+        "It **checks itself**: load LiDAR or any reference and get RMSE, MAE, correlation and an error map."],
+        size=11, bullet="▪", space=4)
+    ui = os.path.join(a, "ui.jpg")
+    picture(s, ui if os.path.exists(ui) else os.path.join(a, "hero.jpg"), 8.98, 1.36, 4.0, 2.28)
+    text(s, 8.98, 3.66, 4.0, 0.3, ("Our app" if os.path.exists(ui) else "Our output") +
+         ": Chungthang, Sikkim, from one WorldView-2 image [9]",
          size=9, color=GREY, italic=True, align=PP_ALIGN.CENTER)
     for i, (v, c, col) in enumerate([
-            ("4.96 m", "average height error on 40 held-out airborne-LiDAR test tiles", BLUE),
-            ("26% lower", "error than RS3DAda, a published height model, on the same tiles", TEAL),
-            ("3.8 m", "full-DSM error on hilly terrain vs airborne LiDAR (terrain map alone: 5.9 m)",
-             ORANGE),
+            ("4.69 m", "average height error (RMSE) on 40 held-out airborne-LiDAR test tiles [3]", BLUE),
+            ("30% lower", "error than RS3DAda, a NeurIPS 2024 height model, on the same tiles [6]", TEAL),
+            ("3.8 m", "full-DSM error on hilly terrain against USGS airborne LiDAR; terrain map "
+             "alone: 5.9 m [8]", ORANGE),
             ("≈ 7 s", "per 600 × 600 m scene on a laptop GPU, fully offline", GREEN)]):
         kpi(s, 0.35 + i * 3.19, 4.08, 3.07, 1.02, v, c, col)
-    text(s, 0.35, 5.2, 12.6, 0.35, ["**HOW IT WORKS**   ·   innovation: the model predicts metres "
-         "directly (no relative-depth guessing) and every result can be checked against LiDAR"],
+    text(s, 0.35, 5.2, 12.6, 0.35, ["**WHAT IS NEW**   ·   heights come out in real metres directly, "
+         "not as relative depth, and every result can be scored against LiDAR inside the app"],
          size=11.5, color=NAVY)
     chevrons(s, 0.35, 5.58, 12.63, 1.12, [
-        ("Image in", "GeoTIFF · PNG · JPG · TIFF"),
-        ("Our AI model", "heights in metres"),
-        ("+ Terrain map", "Copernicus / SRTM"),
-        ("DSM GeoTIFF", "QGIS / ArcGIS ready"),
-        ("3D flythrough", "+ LiDAR check")])
+        ("Upload any image", "GeoTIFF, PNG, JPG or TIFF"),
+        ("AI reads heights", "in metres, per pixel"),
+        ("Add the terrain", "Copernicus or SRTM 30 m [7]"),
+        ("Save the DSM", "GeoTIFF for QGIS / ArcGIS"),
+        ("Fly through in 3D", "and check against LiDAR")])
 
 
 def slide_technical(s, a):
-    section(s, 0.35, 1.28, 6, "TECHNOLOGIES", BLUE)
-    chips = ["Python", "PyTorch", "DINOv3-SAT (Meta)", "GAMUS dataset", "Copernicus GLO-30",
-             "Rasterio · GDAL", "Three.js · WebGL", "USGS 3DEP LiDAR"]
-    widths = [0.3 + 0.085 * len(c) for c in chips]
-    gap = (12.63 - sum(widths)) / (len(chips) - 1)
-    x = 0.35
-    for c, w in zip(chips, widths):
-        b = box(s, x, 1.66, w, 0.36, fill=LIGHT, line=LINE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.5)
-        label(b, [c], size=10.5, color=NAVY)
-        x += w + gap
-    section(s, 0.35, 2.2, 12, "METHODOLOGY: ONE IMAGE TO 3D (real outputs of our pipeline)", BLUE)
+    # the three key milestones, in the problem statement's own words
+    cards = [
+        ("1  ELEVATION EXTRACTION", BLUE, [
+            "Frozen **DINOv3-SAT ViT-L/16** encoder, pre-trained by Meta on 493 M satellite images [4]",
+            "Features from blocks 6, 12, 18 and 24 fused by a **DPT decoder** that we trained [5]",
+            "Output: **height above ground in metres** for every pixel (nDSM)",
+            "Any pixel size normalised to 0.5 m; 608 px tiles, 25% overlap, Gaussian blending, "
+            "flip averaging"]),
+        ("2  SCALE CALIBRATION", TEAL, [
+            "Metric scale **learned from airborne-LiDAR heights** (masked Huber loss in metres) [3]",
+            "**DSM = terrain + heights**: Copernicus GLO-30 or SRTM resampled onto the image grid, "
+            "EGM2008 [7]",
+            "PNG/JPG: relative DSM, or **3+ GCPs** fit an affine to UTM for a full metric DSM",
+            "With reference data: **robust offset + scale** (RANSAC + Huber IRLS), tested on held-out pixels"]),
+        ("3  VISUALIZATION LAYER", ORANGE, [
+            "**Three.js / WebGL** terrain mesh up to 1024 × 1024 vertices, photo draped pixel-exact [10]",
+            "Orbit and **first-person flight**; height, slope and contour shading; height profiles",
+            "**Validation**: upload a reference and get RMSE, MAE, r, an error map and a side-by-side swipe",
+            "Exports **GeoTIFF and GLB**; runs offline in the browser, no cloud"])]
+    for i, (title, col, pts) in enumerate(cards):
+        x = 0.35 + i * 4.265
+        box(s, x, 1.3, 4.1, 2.5, fill=WHITE, line=col, lw=1.25)
+        h = box(s, x, 1.3, 4.1, 0.4, fill=col)
+        label(h, [title], size=12.5, align=PP_ALIGN.LEFT)
+        text(s, x + 0.08, 1.76, 3.95, 2.0, pts, size=10.5, color=INK, bullet="▪", space=4)
+    # the same steps as real outputs of our pipeline
     steps = [("india_rgb.jpg", "Input image", "WorldView-2, 0.31 m"),
-             ("india_tiles.jpg", "Split into tiles", "608 px, 25% overlap"),
+             ("india_tiles.jpg", "Tiling", "608 px, 25% overlap"),
              ("india_features.jpg", "What the AI sees", "DINOv3-SAT features"),
-             ("india_ndsm.jpg", "Height above ground", "our trained head, metres"),
-             ("india_dsm.jpg", "+ terrain = DSM", "Copernicus 30 m, EGM2008"),
+             ("india_ndsm.jpg", "Heights (nDSM)", "metres above ground"),
+             ("india_dsm.jpg", "+ terrain = DSM", "Copernicus 30 m"),
              ("hero.jpg", "3D flythrough", "Three.js, offline")]
-    iw, gap = 1.93, (12.63 - 6 * 1.93) / 5
+    iw, gap, y0 = 1.93, (12.63 - 6 * 1.93) / 5, 3.92
     for i, (f, t, sub) in enumerate(steps):
         x = 0.35 + i * (iw + gap)
-        picture(s, os.path.join(a, f), x, 2.6, iw, 1.72)
-        c = box(s, x + 0.07, 2.67, 0.36, 0.36, fill=NAVY, line=WHITE, shape=MSO_SHAPE.OVAL, lw=1.25)
-        label(c, [str(i + 1)], size=11)
-        text(s, x, 4.36, iw, 0.3, t, size=11, color=NAVY, bold=True, align=PP_ALIGN.CENTER)
-        text(s, x, 4.62, iw, 0.3, sub, size=9.5, color=GREY, align=PP_ALIGN.CENTER)
+        picture(s, os.path.join(a, f), x, y0, iw, 1.18)
+        c = box(s, x + 0.05, y0 + 0.05, 0.3, 0.3, fill=NAVY, line=WHITE, shape=MSO_SHAPE.OVAL, lw=1)
+        label(c, [str(i + 1)], size=10)
+        text(s, x, y0 + 1.2, iw, 0.26, t, size=10.5, color=NAVY, bold=True, align=PP_ALIGN.CENTER)
+        text(s, x, y0 + 1.44, iw, 0.26, sub, size=9, color=GREY, align=PP_ALIGN.CENTER)
         if i < 5:
-            ar = box(s, x + iw + gap / 2 - 0.08, 3.33, 0.16, 0.26, fill=BLUE, shape=MSO_SHAPE.ISOSCELES_TRIANGLE)
+            ar = box(s, x + iw + gap / 2 - 0.07, y0 + 0.47, 0.14, 0.24, fill=BLUE,
+                     shape=MSO_SHAPE.ISOSCELES_TRIANGLE)
             ar.rotation = 90
-    # training & validation
-    box(s, 0.35, 5.02, 7.75, 1.78, fill=LIGHT, line=LINE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.06)
-    text(s, 0.5, 5.07, 7.5, 0.3, "TRAINING AND VALIDATION", size=11.5, color=NAVY, bold=True)
-    mini = [("GAMUS", "aerial photos + airborne-LiDAR heights; 480 train · 48 val · 40 test tiles"),
-            ("Model", "frozen DINOv3-SAT encoder + our DPT head, Huber loss in metres"),
-            ("Tested", "on held-out tiles and 8 USGS LiDAR sites, never on training data")]
-    for i, (h, t) in enumerate(mini):
-        b = box(s, 0.5 + i * 2.52, 5.42, 2.36, 1.26, fill=WHITE, line=LINE,
-                shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.08)
-        label(b, [h, t], size=11.5, color=NAVY)
-    # working prototype
-    box(s, 8.25, 5.02, 4.73, 1.78, fill=LIGHT, line=LINE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.06)
-    picture(s, os.path.join(a, "india_02_height.jpg"), 8.35, 5.12, 2.3, 1.58)
-    text(s, 10.72, 5.1, 2.2, 0.3, "WORKING PROTOTYPE", size=11.5, color=NAVY, bold=True)
-    text(s, 10.72, 5.42, 2.2, 1.3, "Upload an image, get the DSM, fly through it in 3D and "
-         "check it against LiDAR, all in the browser, offline.", size=10, color=INK)
+    chips = ["Python", "PyTorch", "DINOv3-SAT", "HF Transformers", "Rasterio · GDAL",
+             "Copernicus GLO-30", "Three.js · WebGL", "GAMUS", "USGS 3DEP LiDAR"]
+    widths = [max(0.9, 0.28 + 0.08 * len(c)) for c in chips]
+    cg = (12.63 - sum(widths)) / (len(chips) - 1)
+    x = 0.35
+    for c, w in zip(chips, widths):
+        b = box(s, x, 5.7, w, 0.32, fill=LIGHT, line=LINE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.5)
+        label(b, [c], size=10, color=NAVY)
+        x += w + cg
+    b = box(s, 0.35, 6.14, 12.63, 0.66, fill=LIGHT, line=LINE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.1)
+    label(b, ["**TRAINING**   GAMUS [3]: 1,500 training, 48 validation and 40 held-out test tiles of "
+              "aerial RGB with airborne-LiDAR heights  ·  AdamW, masked Huber loss in metres  ·  "
+              "model chosen on the validation split only"], size=10.5, color=NAVY, bold=False)
 
 
 def slide_feasibility(s, a):
     for i, (t, d, col) in enumerate([
-            ("It already works", "Built and tested end to end: image in, DSM GeoTIFF and 3D "
-             "scene out. 101 automated tests pass.", BLUE),
-            ("Accuracy is measured", "40 held-out LiDAR tiles and 8 USGS airborne-LiDAR sites, "
-             "from towns to hills.", TEAL),
-            ("Cheap to run", "Laptop GPU, offline, free data (GAMUS, Copernicus DEM). "
-             "No survey flights.", GREEN)]):
+            ("Working prototype today", "Upload an image and get a DSM GeoTIFF and a 3D scene in "
+             "seconds. Covered by 101 automated tests.", BLUE),
+            ("Checked against real LiDAR", "40 held-out GAMUS test tiles [3] and 8 USGS "
+             "airborne-LiDAR sites [8], from towns to hills.", TEAL),
+            ("Low cost, runs offline", "A laptop GPU and free data: GAMUS [3] and the Copernicus "
+             "DEM [7]. No survey flights needed.", GREEN)]):
         x = 0.35 + i * 4.24
         box(s, x, 1.3, 4.1, 0.98, fill=WHITE, line=col, lw=1.25)
         box(s, x, 1.3, 0.09, 0.98, fill=col)
         text(s, x + 0.2, 1.33, 3.8, 0.35, t, size=13, color=col, bold=True)
         text(s, x + 0.2, 1.66, 3.8, 0.6, d, size=10, color=GREY)
-    chart(s, 0.35, 2.4, 6.2, 2.4, "Height error on 40 held-out LiDAR tiles (RMSE, m)",
-          ["Urban", "Sparse", "Forest", "Overall"],
-          [("Predict 0 m", (8.81, 4.21, 13.66, 9.35)), ("RS3DAda (run by us)", (5.11, 2.83, 11.87, 6.74)),
-           ("Ours", (5.28, 2.15, 5.91, 4.96))], [SOFT, RGBColor(0x7C, 0x8E, 0xA8), RED])
-    chart(s, 6.78, 2.4, 6.2, 2.4, "Full elevation model vs airborne LiDAR (RMSE, m)",
+    chart(s, 0.35, 2.4, 6.2, 2.2, "Error on 40 held-out LiDAR test tiles, metres [3]",
+          ["RMSE", "MAE"],
+          [("Predict 0 m", (9.35, 5.10)), ("RS3DAda [6]", (6.74, 3.47)), ("Ours", (4.69, 2.29))],
+          [SOFT, RGBColor(0x7C, 0x8E, 0xA8), RED])
+    text(s, 0.35, 4.58, 6.2, 0.28, "Correlation with LiDAR: **ours r = 0.81**, RS3DAda r = 0.60",
+         size=10, color=NAVY, align=PP_ALIGN.CENTER)
+    chart(s, 6.78, 2.4, 6.2, 2.2, "Full DSM vs airborne LiDAR, RMSE in metres [8]",
           ["Residential", "Sparse", "Hilly", "Forest"],
           [("Terrain map alone", (6.95, 4.99, 5.88, 8.43)), ("Ours: terrain + model", (5.40, 3.57, 3.84, 7.95))],
           [RGBColor(0x9F, 0xB6, 0xCD), RED])
-    rows = [("Challenge", "How we handle it"),
-            ("Tall towers and dense 25 m canopy are under-predicted.",
-             "We report it openly (35.9 m error in a downtown); next, more tall-building and forest tiles in training."),
-            ("Trained on US aerial photos; Indian satellite accuracy not yet measured.",
-             "Pixel-size normalisation (tested 0.3–1 m); the built-in reference check scores any ISRO scene with ground truth."),
-            ("Metric scale from one image is ill-posed.",
-             "Model trained on LiDAR metres; terrain from Copernicus or SRTM; map points or a reference raster calibrate."),
-            ("Angled (oblique) photos show building walls.",
-             "We take top-down satellite and aerial imagery, as the problem statement specifies.")]
-    tb = s.shapes.add_table(len(rows), 2, Inches(0.35), Inches(4.92), Inches(12.63), Inches(1.9)).table
-    tb.columns[0].width, tb.columns[1].width = Inches(5.2), Inches(7.43)
+    text(s, 6.78, 4.58, 6.2, 0.28, "Whole pipeline, GeoTIFF in → DSM out, on 8 USGS sites",
+         size=10, color=NAVY, align=PP_ALIGN.CENTER)
+    rows = [("Risk", "Mitigation"),
+            ("Very tall towers and dense forest canopy",
+             "More tall-building and forest tiles in training; per-landscape scores tracked on every run."),
+            ("New sensors and regions (ISRO imagery)",
+             "Pixel size normalised (0.3–1 m tested); the built-in reference check scores and calibrates on ISRO data."),
+            ("Absolute scale from a single image",
+             "Metric training on LiDAR heights, DEM / SRTM fusion, GCPs and reference-based calibration."),
+            ("Angled (oblique) photos",
+             "Built for top-down satellite and aerial imagery, as the problem statement specifies.")]
+    tb = s.shapes.add_table(len(rows), 2, Inches(0.35), Inches(4.95), Inches(12.63), Inches(1.85)).table
+    tb.columns[0].width, tb.columns[1].width = Inches(4.2), Inches(8.43)
     for r, (c1, c2) in enumerate(rows):
         for c, t in enumerate((c1, c2)):
             cell = tb.cell(r, c)
@@ -358,14 +379,15 @@ def slide_feasibility(s, a):
             rich(cell.text_frame.paragraphs[0], t, 11 if r == 0 else 10, WHITE if r == 0 else INK, bold=r == 0)
             cell.fill.solid()
             cell.fill.fore_color.rgb = BLUE if r == 0 else (WHITE if r % 2 else LIGHT)
-        tb.rows[r].height = Inches(0.34 if r == 0 else 0.39)
+        tb.rows[r].height = Inches(0.33 if r == 0 else 0.38)
 
 
 def slide_impact(s, a):
     section(s, 0.35, 1.28, 6, "WHO IT HELPS", BLUE)
     for i, (f, t, d) in enumerate([
             ("india_04_flood.jpg", "Disaster management",
-             "Flood and landslide screening from one image. Here, at a 36 m river rise, 12 of 204 buildings are reached."),
+             "Flood and landslide screening from one image. In Chungthang [9], a 36 m river rise "
+             "reaches 12 of 204 buildings."),
             ("india_03_buildings_floors.jpg", "Urban planning",
              "Building heights and floor estimates, slopes and contours for growth, drainage and rooftop planning."),
             ("hero.jpg", "Remote and border areas",
@@ -391,7 +413,7 @@ def slide_impact(s, a):
 
 def slide_references(s, a):
     refs = [("India flood losses", "UNISDR Global Assessment Report 2015: India AAL ≈ USD 9.8 bn/yr, floods USD 7.4 bn."),
-            ("Elevation survey cost", "Kapcher / Candrone: LiDAR survey $5k–$100k+; survey-grade LiDAR hardware over $100k."),
+            ("Elevation survey cost", "Kapcher / Candrone: LiDAR survey $5k–$100k+; Drone Launch Academy: survey-grade LiDAR over $100k."),
             ("GAMUS dataset", "Xiong et al., “GAMUS: Geometry-aware Multi-modal Semantic Segmentation Benchmark”, arXiv:2305.14914."),
             ("DINOv3", "Meta AI, 2025: self-supervised vision model; SAT-493M satellite weights (our frozen encoder)."),
             ("DPT head", "Ranftl et al., “Vision Transformers for Dense Prediction”, ICCV 2021."),
@@ -418,8 +440,15 @@ def main():
     ap.add_argument("--official", required=True)
     ap.add_argument("--team-deck", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--ui-shot", default=None,
+                    help="optional screenshot of the running app, shown on slide 2")
     a = ap.parse_args()
     assets = prepare_assets(a.team_deck, os.path.join(tempfile.gettempdir(), "dw_ppt_assets"))
+    ui = os.path.join(assets, "ui.jpg")
+    if a.ui_shot:
+        Image.open(a.ui_shot).convert("RGB").save(ui, quality=95)
+    elif os.path.exists(ui):
+        os.remove(ui)
     prs = Presentation(a.official)
     # the instructions slide (7) says to delete it before submitting
     ids = prs.slides._sldIdLst
@@ -427,9 +456,8 @@ def main():
     prs.part.drop_rel(last.rId)
     ids.remove(last)
     sl = list(prs.slides)
-    # slides 1 (title) and 6 (references) are left as the official template:
-    # the team fills them in (title_slide / slide_references are kept as drafts)
-    for s in sl[1:5]:
+    # slide 1 (title) is left as the official template for the team to fill in
+    for s in sl[1:6]:
         for sh in list(s.shapes):
             if sh.name.startswith("Oval") or sh.name == "TextBox 8":
                 remove(sh)
@@ -438,6 +466,7 @@ def main():
     slide_technical(sl[2], assets)
     slide_feasibility(sl[3], assets)
     slide_impact(sl[4], assets)
+    slide_references(sl[5], assets)
     prs.save(a.out)
     print("wrote", a.out)
 
