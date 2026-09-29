@@ -97,7 +97,7 @@ because it needs no login).
 
 | PS requirement | where / status |
 |---|---|
-| PNG/JPG → rDSM | `dsm.py` (`rdsm_0to1.png`, `ndsm.tif`); live upload ✔ |
+| PNG/JPG (and TIFF without coordinates) → rDSM | `dsm.py` (`rdsm_0to1.png`, `ndsm.tif`); live upload ✔ |
 | GeoTIFF → absolute metric DSM, standard geospatial format | `dsm.tif` float32 GeoTIFF, input CRS and grid ✔ |
 | Pre-trained backbone | DINOv3-SAT (frozen) ✔ (a satellite foundation model, not a relative-depth model: see the design decision) |
 | Low-res DEM (e.g. SRTM) or GCPs for absolute scale | Copernicus GLO-30 by default, any DEM via `--dem`, GCPs for PNG/JPG ✔ |
@@ -211,6 +211,11 @@ python dsm.py image.tif --dem srtm.tif                               # your own 
 python validate.py out_dsm/chungthang reference_dsm.tif
 ```
 
+**Demo files**: [`demo/`](demo/README.md) holds every input used in the demo video, one
+folder per part: a GeoTIFF with its LiDAR reference, the same image as PNG / JPG /
+plain TIFF, GAMUS PNGs with their LiDAR height TIFFs, the Indian GeoTIFF, and the
+result charts (rebuild: `python docs/make_demo_folder.py --gamus <GAMUS test folder>`).
+
 **LiDAR truth vs real image demo** (not part of the normal app; only with this flag):
 
 ```bash
@@ -247,7 +252,8 @@ python serve.py --demo-lidar
 - **Scene info**: image, model, output type, map projection, pixel size, extent,
   elevation range, terrain source, vertical datum, validation status.
 - **Live mode**: upload, choose a model, run, then "Check against a reference"
-  (accuracy table + error map).
+  (accuracy table + error map), then **Compare side by side**: photo, reference,
+  our heights and error on the same pixels, with a swipe divider and hover read-out.
 - **Export**: DSM / heights / terrain / error / calibrated GeoTIFFs, run report,
   textured **3D model (.glb, true scale)**, screenshot.
 - **Tools**: flood "bathtub" screening, candidate buildings with floor estimates,
@@ -286,6 +292,7 @@ tests/              unit/integration tests + benchmark scripts
 results/            measured benchmark outputs
 docs/               architecture diagram and figure scripts
 samples/            Chungthang (India) and Park City (US, with LiDAR) inputs
+demo/               every file used in the demo video (inputs + references + charts)
 PPT Details/        presentation material: metrics, charts, LiDAR figures, audit
 ```
 

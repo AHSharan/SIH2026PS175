@@ -284,7 +284,7 @@
   <label for="lv-model">Model</label>
   <select id="lv-model"></select>
   <div id="lv-gsd-row" style="display:none">
-    <label for="lv-gsd">Pixel size (m), PNG/JPG only</label>
+    <label for="lv-gsd">Pixel size (m): used only if the image has no map information</label>
     <input type="number" id="lv-gsd" min="0.05" max="5" step="0.05" value="0.5">
     <label style="display:flex;gap:6px;align-items:center;margin-top:6px">
       <input type="checkbox" id="lv-unk" style="width:auto"> I don't know the pixel size</label>
@@ -316,6 +316,7 @@
   <div class="kv"><span>Bias</span><b id="v-bias">-</b></div>
   <table id="v-table"></table>
   <div class="note" id="v-note"></div>
+  <button id="v-compare" style="margin-top:8px" title="Photo, reference and our heights side by side, with a swipe divider">Compare side by side</button>
 </div>
 
 <div class="panel" id="right">
@@ -381,7 +382,7 @@
 <!-- LiDAR truth vs real image: only shown with ?demo=lidar (python serve.py --demo-lidar) -->
 <div class="panel" id="demo">
   <div class="dhead">
-    <div><b>Real image vs LiDAR truth</b>
+    <div><b id="demo-title">Real image vs LiDAR truth</b>
       <small id="demo-sub">-</small></div>
     <div class="dctl">
       <select id="demo-scene" title="GAMUS test tile"></select>
@@ -766,7 +767,8 @@ async function loadScene(name){
   if(typeof liveRefUI==='function')liveRefUI();
 
   toolsAvailable();
-  if(DEMO)demoPrepare();
+  DV.layers=null;                                // compare view is per scene
+  if(DEMO)demoPrepare(); else closeCompare();
   buildMesh();
   frameScene();
   $('loading').style.display='none';
@@ -1326,8 +1328,9 @@ addEventListener('keydown',e=>{ if(e.code==='Escape'&&T.tour)stopTour(); });
    ground, colour + hillshade), our model's height from the photo alone, and
    the error. LiDAR and model share one colour scale so they compare directly.
    Swipe: photo on the left, the chosen layer on the right of the divider. */
-const DV={view:'img',swipe:false,x:0.5,layers:null,hi:1};
-function shadeLayer(h,W,H,hi,gsd){
+const DV={view:'img',swipe:false,x:0.5,layers:null,lo:0,hi:1};
+const refWord=()=>DEMO?'LiDAR':'reference';
+function shadeLayer(h,W,H,lo,hi,gsd){
   const out=new ImageData(W,H), d=out.data;
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const k=y*W+x, v=h[k];
@@ -1336,7 +1339,7 @@ function shadeLayer(h,W,H,hi,gsd){
     const dzdy=(h[Math.min(H-1,y+1)*W+x]-h[Math.max(0,y-1)*W+x])/(2*gsd);
     const nx=-dzdx, ny=-dzdy, nz=1, n=Math.hypot(nx,ny,nz);
     const sh=Math.max(0,(nx*-0.5+ny*-0.5+nz*0.707)/n);
-    const c=turbo(v/hi), f=0.55+0.45*sh, o=k*4;
+    const c=turbo((v-lo)/(hi-lo)), f=0.55+0.45*sh, o=k*4;
     d[o]=c[0]*f; d[o+1]=c[1]*f; d[o+2]=c[2]*f; d[o+3]=255;
   }
   return out;
@@ -1350,23 +1353,49 @@ function errLayer(p,r,W,H){
 function toCanvas(img,W,H){const c=document.createElement('canvas');c.width=W;c.height=H;
   const x=c.getContext('2d'); if(img instanceof ImageData)x.putImageData(img,0,0);
   else x.drawImage(img,0,0,W,H); return c;}
+// Used two ways: the GAMUS demo (?demo=lidar, opens on load) and, in the normal
+// app, the "Compare side by side" button after a run was scored against a
+// reference (validate.py). Same four layers either way.
 function demoPrepare(){
   const {W,H,gsd}=S;
-  if(!S.ref){ DV.layers=null; $('demo-sub').textContent='This scene has no LiDAR truth.'; return; }
+  if(!S.ref){ DV.layers=null; $('demo-sub').textContent='This scene has no reference to compare with.'; return; }
+  DV.for=S;                                    // layers belong to this scene
   const all=Array.from(S.ref).concat(Array.from(S.pred)).filter(Number.isFinite).sort((a,b)=>a-b);
-  DV.hi=Math.max(2,all[Math.floor(all.length*0.99)]);
-  DV.layers={img:toCanvas(texMap.image,W,H), lidar:toCanvas(shadeLayer(S.ref,W,H,DV.hi,gsd),W,H),
-             model:toCanvas(shadeLayer(S.pred,W,H,DV.hi,gsd),W,H), err:toCanvas(errLayer(S.pred,S.ref,W,H),W,H)};
-  const m=S.meta, dm=m.demo||{}, mt=m.metrics;
-  $('demo-sub').textContent=`${m.tile_id||m.name} · ${dm.landscape||''} · ${(W*gsd).toFixed(0)} × ${(H*gsd).toFixed(0)} m`+
-    (dm.chosen?` · ${dm.chosen}`:'');
-  $('demo-met').textContent=mt?`This tile: RMSE ${mt.rmse_m.toFixed(2)} m · MAE ${mt.mae_m.toFixed(2)} m`+
-    (mt.r!=null?` · r ${mt.r.toFixed(2)}`:''):'';
-  $('demo-note').textContent=(dm.truth||'LiDAR truth: height above ground from airborne laser scanning.')+
-    '. Our model never sees the LiDAR: it predicts from the photo alone. '+(dm.metrics_at?`Metrics: ${dm.metrics_at}.`:'');
-  $('demo').style.display='flex'; $('demo-open').style.display='none';
-  demoScenes(); demoDraw();
+  const elev=S.meta.kind==='dsm';              // elevation above sea level, not height from 0
+  DV.lo=elev?all[Math.floor(all.length*0.01)]:0;
+  DV.hi=Math.max(DV.lo+2,all[Math.floor(all.length*0.99)]);
+  DV.layers={img:toCanvas(texMap.image,W,H), lidar:toCanvas(shadeLayer(S.ref,W,H,DV.lo,DV.hi,gsd),W,H),
+             model:toCanvas(shadeLayer(S.pred,W,H,DV.lo,DV.hi,gsd),W,H), err:toCanvas(errLayer(S.pred,S.ref,W,H),W,H)};
+  const m=S.meta, dm=m.demo||{}, mt=m.metrics, v=m.validation;
+  $('demo-title').textContent=DEMO?'Real image vs LiDAR truth':'Real image vs reference';
+  document.querySelector('[data-dv="lidar"]').textContent=DEMO?'LiDAR truth':'Reference';
+  $('demo-scene').style.display=DEMO?'':'none';
+  $('demo-3d').textContent=DEMO?'View in 3D':'Back to 3D';
+  $('demo-sub').textContent=DEMO?`${m.tile_id||m.name} · ${dm.landscape||''} · ${(W*gsd).toFixed(0)} × ${(H*gsd).toFixed(0)} m`+
+    (dm.chosen?` · ${dm.chosen}`:''):
+    `${m.name} · ${(W*gsd).toFixed(0)} × ${(H*gsd).toFixed(0)} m · reference: ${m.reference_name||'-'}`;
+  const r=mt&&mt.r!=null?mt.r:(v&&v.rows?v.rows[0].r:null);
+  // for elevations r is ~1.00 on any hill (terrain dominates): show the
+  // no-model baseline instead, which says what the model adds
+  const base0=v&&v.reference_type==='surface'&&v.rows?v.rows.find(x=>/no model/.test(x.label)):null;
+  $('demo-met').textContent=mt?`${DEMO?'This tile':'Nothing adjusted'}: RMSE ${mt.rmse_m.toFixed(2)} m · MAE ${mt.mae_m.toFixed(2)} m`+
+    (base0?` · terrain map alone ${base0.rmse_m.toFixed(2)} m`:(r!=null?` · r ${r.toFixed(2)}`:'')):'';
+  $('demo-note').textContent=DEMO?(dm.truth||'LiDAR truth: height above ground from airborne laser scanning.')+
+    '. Our model never sees the LiDAR: it predicts from the photo alone. '+(dm.metrics_at?`Metrics: ${dm.metrics_at}.`:''):
+    `${v?v.reference_type==='surface'?'Reference and our DSM are elevations above sea level':'Reference and ours are heights above ground':''}`+
+    '. Our model never sees the reference: it predicts from the photo alone. Same colour scale for both.';
+  if(DEMO){ openCompare(); demoScenes(); }
 }
+function openCompare(){
+  if(!S||!S.ref){ toast('Score this run against a reference first'); return; }
+  if(!DV.layers||DV.for!==S)demoPrepare();
+  $('demo').style.display='flex'; $('demo-open').style.display='none';
+  $('toast').classList.remove('show');         // no 3D hint over the compare view
+  $('demo-read').textContent=`Move the mouse over the picture to read ${refWord()} and model heights.`;
+  demoDraw();
+}
+function closeCompare(){ $('demo').style.display='none'; }
+$('v-compare').onclick=openCompare;
 function demoDraw(){
   const cv=$('demo-cv'); if(!DV.layers)return;
   const {W,H}=S; if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
@@ -1385,8 +1414,9 @@ function demoDraw(){
     stops.push(`rgb(${c[0]},${c[1]},${c[2]}) ${t*100}%`);}
   $('demo-leg').style.visibility=$('demo-lab').style.visibility=lay==='img'?'hidden':'visible';
   $('demo-leg').style.background=`linear-gradient(90deg,${stops.join(',')})`;
-  $('demo-lab').children[0].textContent=lay==='err'?'-10 m (model too low)':'0 m';
-  $('demo-lab').children[1].textContent=lay==='err'?'+10 m (model too high)':DV.hi.toFixed(0)+' m above ground';
+  const unit=S.meta.kind==='dsm'?' m above sea level':' m above ground';
+  $('demo-lab').children[0].textContent=lay==='err'?'-10 m (model too low)':DV.lo.toFixed(0)+' m';
+  $('demo-lab').children[1].textContent=lay==='err'?'+10 m (model too high)':DV.hi.toFixed(0)+unit;
   document.querySelectorAll('[data-dv]').forEach(b=>b.classList.toggle('active',b.dataset.dv===v));
   $('demo-swipe').classList.toggle('active',DV.swipe);
 }
@@ -1395,8 +1425,8 @@ function demoScenes(){ const d=$('demo-scene'); d.innerHTML=$('scene').innerHTML
   d.onchange=async()=>{ $('scene').value=d.value; await loadScene(d.value); }; }
 document.querySelectorAll('[data-dv]').forEach(b=>b.onclick=()=>demoView(b.dataset.dv));
 $('demo-swipe').onclick=()=>{ DV.swipe=!DV.swipe; if(DV.swipe&&DV.view==='img')DV.view='lidar'; demoDraw(); };
-$('demo-3d').onclick=()=>{ $('demo').style.display='none'; $('demo-open').style.display='block';
-  if(S&&S.ref)setSource('ref'); };
+$('demo-3d').onclick=()=>{ closeCompare();
+  if(DEMO){ $('demo-open').style.display='block'; if(S&&S.ref)setSource('ref'); } };
 $('demo-open').onclick=()=>{ $('demo').style.display='flex'; $('demo-open').style.display='none';
   if(S&&S.ref)setSource('pred'); demoDraw(); };
 $('demo-cv').addEventListener('mousemove',e=>{
@@ -1405,18 +1435,22 @@ $('demo-cv').addEventListener('mousemove',e=>{
   if(DV.swipe){ DV.x=Math.max(0,Math.min(1,fx)); demoDraw(); }
   const px=Math.min(S.W-1,Math.max(0,Math.floor(fx*S.W))), py=Math.min(S.H-1,Math.max(0,Math.floor(fy*S.H)));
   const k=py*S.W+px, l=S.ref[k], p=S.pred[k], e2=p-l;
-  $('demo-read').textContent=`LiDAR ${l.toFixed(1)} m  ·  our model ${p.toFixed(1)} m  ·  error `+
+  const w=refWord(), W0=w[0].toUpperCase()+w.slice(1);
+  $('demo-read').textContent=`${W0} ${l.toFixed(1)} m  ·  our model ${p.toFixed(1)} m  ·  error `+
     `${e2>=0?'+':''}${e2.toFixed(1)} m  ·  pixel ${px}, ${py}`;
 });
+const compareOpen=()=>$('demo').style.display!=='none';
 addEventListener('keydown',e=>{
-  if(!DEMO||$('demo').style.display==='none'||e.target.tagName==='INPUT')return;
+  if(!compareOpen()||e.target.tagName==='INPUT')return;
   if(e.code==='KeyT')demoView(DV.view==='img'?'lidar':'img');
   if(e.code==='KeyS')$('demo-swipe').onclick();
+  if(e.code==='Escape'&&!DEMO)closeCompare();
 });
-addEventListener('resize',()=>{ if(DEMO&&$('demo').style.display!=='none')demoDraw(); });
+addEventListener('resize',()=>{ if(compareOpen())demoDraw(); });
 
 window.DW={demo:{view:v=>demoView(v),swipe:(on,x)=>{DV.swipe=on;if(x!=null)DV.x=x;demoDraw();},
-    get state(){return {view:DV.view,swipe:DV.swipe,hi:DV.hi,ready:!!DV.layers};}},
+    open:()=>openCompare(), close:()=>closeCompare(),
+    get state(){return {view:DV.view,swipe:DV.swipe,lo:DV.lo,hi:DV.hi,ready:!!DV.layers,open:compareOpen()};}},
   setMode:m=>{const b=document.querySelector(`[data-mode="${m}"]`);
   if(b&&!b.disabled)b.click();},
   frame:()=>frameScene(), get state(){return S;},
@@ -1515,7 +1549,7 @@ async function initLive(){
   $('lv-val').onclick=runValidate;
   liveRefUI();
   $('lv-file').onchange=()=>{const f=$('lv-file').files[0];
-    $('lv-gsd-row').style.display=f&&/\.(png|jpe?g)$/i.test(f.name)?'block':'none';};
+    $('lv-gsd-row').style.display=f&&/\.(png|jpe?g|tiff?)$/i.test(f.name)?'block':'none';};
   $('lv-unk').onchange=()=>{$('lv-gsd').disabled=$('lv-unk').checked;};
   $('lv-run').onclick=runLive;
 }
@@ -1535,14 +1569,15 @@ async function runValidate(){
   if(r.error){ $('lv-val-st').textContent='Error: '+r.error; return; }
   const raw=r.rows[0];
   $('lv-val-st').textContent=`Raw RMSE ${raw.rmse_m.toFixed(2)} m against ${r.reference}. `+
-    'Table on the right; Surface → Error shows where it is wrong.';
+    'Table on the right; "Compare side by side" or Surface → Error shows where it is wrong.';
   await loadScene(scene);
 }
 const LV_STEPS=['queued','loading model','reading image','predicting heights','adding terrain',
   'building 3D scene','finishing','done'];
 async function runLive(){
   const f=$('lv-file').files[0]; if(!f){toast('Choose an image first');return;}
-  const isPix=/\.(png|jpe?g)$/i.test(f.name);
+  // PNG/JPG and TIFFs; the server ignores these fields for a TIFF with a map position
+  const isPix=/\.(png|jpe?g|tiff?)$/i.test(f.name);
   const q=new URLSearchParams({name:f.name,model:$('lv-model').value});
   if(isPix){
     const g=$('lv-gcp').value.trim();

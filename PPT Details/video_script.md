@@ -29,7 +29,8 @@ Each part is recorded as a separate clip, then joined (Clipchamp comes with Wind
    **"DINOv3 on disk (offline OK)"**. The browser opens by itself.
 3. Browser full screen (**F11**), zoom 100 %, window 1920 × 1080. Close other tabs.
 4. Warm-up (so nothing waits on loading in the video): in **Run a model**, run
-   `samples/chungthang_wv2.tif` once with model **best**.
+   `demo/4_geotiff_india/chungthang_wv2.tif` once with model **best**.
+   Every file used below is in the **`demo/`** folder (see `demo/README.md`).
 5. Second terminal for part 3: `python serve.py --demo-lidar --port 8778` (opens its own tab).
 6. Recorder: **Win + Alt + R** starts and stops (Game Bar, saves MP4), or OBS.
 7. Record the voice-over separately afterwards and lay it on top: cleaner than
@@ -48,15 +49,18 @@ photo. Every point you see has a real height in metres."
 ## Part 1: GeoTIFF, checked against real LiDAR (0:10–1:10)
 
 **Screen:**
-1. **Run a model** → choose `samples/park_city_naip2021.tif` → model **best** → **Run**.
+1. **Run a model** → choose `demo/1_geotiff_with_lidar/park_city_naip2021.tif` → model **best** → **Run**.
    Show the progress bar, then the pipeline bar at the top lighting up:
    Image › Model › Terrain › DSM.
 2. The 3D scene opens. Drag to orbit once. **Surface → Height.**
 3. Point the mouse at **Scene info**: map projection, pixel size 0.6 m, terrain
    Copernicus GLO-30, elevation about 2,125 to 2,316 m.
-4. **Check against a reference** → choose `samples/park_city_lidar_dsm_2m.tif` →
+4. **Check against a reference** → choose `demo/1_geotiff_with_lidar/park_city_lidar_reference.tif` →
    **Score this run**. The **Accuracy** panel appears; the **Validated** chip turns green.
-5. **Surface → Error.** Orbit slowly over the red/blue map.
+5. **Compare side by side** (in the Accuracy panel) → **Swipe** on → move the mouse
+   slowly: photo on the left, LiDAR reference on the right. Click **Our model**, then
+   **Error**. Hover a roof: the line underneath shows reference, model and error.
+6. **Back to 3D** → **Surface → Error.** Orbit slowly over the red/blue map.
 
 **Say:** "We start with a georeferenced GeoTIFF: an aerial photo of a hillside in
 Utah. Our model predicts the height of every building and tree from the photo
@@ -65,23 +69,29 @@ surface model in metres above sea level. Now we check it against airborne LiDAR
 for the same place. The error is 3.3 metres. Using the terrain map alone would
 give 4.9, so the model clearly adds the buildings and trees. The adjusted rows
 are fitted on one half of the area and tested on the other half, so they cannot
-flatter themselves. Blue means we are too low, red too high."
+flatter themselves. Side by side, you can see the photo, the laser truth and our
+prediction on the same pixels. Blue means we are too low, red too high."
 
-## Part 2: a plain PNG (1:10–1:45)
+## Part 2: PNG, JPG and plain TIFF (1:10–1:50)
 
-**Screen:**
-1. **Run a model** → choose `samples/chungthang_plain.png`. The PNG options appear.
-2. First tick **"I don't know the pixel size"** → **Run** → badge says
-   **RELATIVE SHAPE**. Orbit once.
-3. Untick it, type pixel size **0.3** → **Run** again → heights now in metres
-   (Scene info: output "Heights above ground").
+**Screen:** (files in `demo/2_png_jpg_tiff/`, the same picture three ways)
+1. **Run a model** → `chungthang_plain.png` → tick **"I don't know the pixel size"**
+   → **Run** → badge says **RELATIVE SHAPE**. Orbit once.
+2. **Run a model** → `chungthang_plain.jpg` → pixel size **0.3** → **Run** →
+   heights in metres (Scene info: output "Heights above ground").
+3. *(Optional, 5 s)* the same with `chungthang_plain.tif`: a TIFF without map
+   information is handled like PNG/JPG.
 
-**Say:** "Not every image has map information. With a plain PNG we still get the
+**Say:** "Not every image has map information. From a plain PNG we still get the
 shape of the terrain, a relative surface model. If we know the pixel size, the
-heights are in real metres. And with three map points the image is placed on the
-map and gets a full elevation model."
+heights are in real metres, and it works the same for JPG and for TIFFs without
+coordinates. With three map points the image is placed on the map and gets a
+full elevation model."
 
 *(Optional, only if time allows: show the "Map points" box.)*
+*(Optional extra: `demo/3_gamus_png_with_lidar/`: upload `urban_DC_27_47_image.png`
+with pixel size 0.3, then check it against `urban_DC_27_47_lidar_heights.tif`: a PNG
+scored against LiDAR, RMSE 3.34 m.)*
 
 ## Part 3: real image vs LiDAR truth (1:45–2:25)
 

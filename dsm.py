@@ -95,6 +95,15 @@ def _edge_black(rgb):
     return np.isin(lab, fill)
 
 
+def has_crs(path: str) -> bool:
+    """True for a GeoTIFF with map coordinates; False for PNG/JPG or a plain TIFF."""
+    if not path.lower().split("?")[0].endswith((".tif", ".tiff")):
+        return False
+    import rasterio
+    with rasterio.open(_gdal_path(path)) as s:
+        return s.crs is not None
+
+
 def read_image(path: str, window=None):
     """-> dict(rgb HxWx3 float32 0-255, valid HxW bool, crs, transform, gsd,
     georef bool). window = (col, row, width, height) in pixels."""
@@ -447,7 +456,10 @@ def georeference_image(path, gcps, out_tif):
     from rasterio.transform import Affine
     from rasterio.warp import transform as warp
     from PIL import Image
-    rgb = np.asarray(Image.open(path).convert("RGB"))
+    if path.lower().endswith((".tif", ".tiff")):          # plain TIFF (any bit depth)
+        rgb = np.clip(read_image(path)["rgb"], 0, 255).astype(np.uint8)
+    else:
+        rgb = np.asarray(Image.open(path).convert("RGB"))
     H, W = rgb.shape[:2]
     if len(gcps) < 3:
         raise ValueError("need at least 3 ground control points")
@@ -574,7 +586,7 @@ def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
     os.makedirs(out, exist_ok=True)
     georef_info = None
     if gcps:
-        if image.lower().split("?")[0].endswith((".tif", ".tiff")):
+        if has_crs(image):
             print("[gcp] the input is already a GeoTIFF: ground control points ignored")
         else:
             georef_info = georeference_image(image, gcps if isinstance(gcps, list) else
@@ -601,7 +613,8 @@ def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
             print(f"[image] {W}x{H} px, NO georeference, pixel size UNKNOWN: assuming "
                   f"{in_gsd} m. Output = relative shape only, not metres.")
         else:
-            raise SystemExit("PNG/JPG has no georeference: pass --gsd <metres per pixel>, "
+            raise SystemExit("the image has no georeference (PNG/JPG or a plain TIFF): pass "
+                             "--gsd <metres per pixel>, "
                              "--gsd-unknown, or 3+ ground control points (--gcp)")
 
     fn = fn or get_backend(backend, ckpt, synrs3d_dir, head)

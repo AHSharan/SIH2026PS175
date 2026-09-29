@@ -44,18 +44,20 @@ no licence to use it is granted except as written below.
 
    - GAMUS dataset (Xiong et al., arXiv 2305.14914), CC BY 4.0:
      web/assets/ and web/assets_lidar/ (GAMUS test tiles; the latter also
-     holds our model's predictions for them) and images rendered from them
-     (shots/0*, shots/test_native.jpg, docs/thumbs/gamus_*).
+     holds our model's predictions for them), demo/3_gamus_png_with_lidar/, and
+     images rendered from them (shots/0*, shots/test_native.jpg, docs/thumbs/gamus_*).
    - Maxar Open Data Program imagery, CC BY-NC 4.0 — WorldView-2, 2022-03-07,
      catalog 10300100CE8D0400: samples/chungthang_wv2.tif, samples/chungthang_plain.png
-     (a plain 1024 px crop of it) and images derived
+     (a plain 1024 px crop of it), demo/2_png_jpg_tiff/, demo/4_geotiff_india/
+     and images derived
      from it (docs/thumbs/india_*, shots/india_*, shots/live_jpg_result.jpg).
    - Copernicus DEM GLO-30 — (c) DLR e.V. 2010-2014 and (c) Airbus Defence and
      Space GmbH 2014-2018, provided under COPERNICUS by the European Union and
      ESA: samples/chungthang_glo30.tif and elevation images derived from it.
    - The architecture diagrams in docs/ contain images from the sources above.
    - USDA NAIP imagery and USGS 3DEP LiDAR (U.S. public domain):
-     samples/park_city_naip2021.tif, samples/park_city_lidar_dsm_2m.tif.
+     samples/park_city_naip2021.tif, samples/park_city_lidar_dsm_2m.tif and their
+     copies in demo/1_geotiff_with_lidar/.
    - Three.js r169 (MIT, (c) 2010-2024 three.js authors), bundled so the viewer
      works offline: web/vendor/three/ (its licence: web/vendor/three/LICENSE).
 

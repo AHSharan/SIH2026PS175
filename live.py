@@ -224,15 +224,29 @@ class Jobs:
         ext = os.path.splitext(filename)[1].lower()
         if ext not in IMAGE_EXT:
             raise ValueError(f"unsupported file type '{ext}': use GeoTIFF, PNG or JPG")
+        # "plain" = no map information: PNG/JPG, or a TIFF without a CRS. A GeoTIFF
+        # carries its own position and pixel size, so pixel size / map points
+        # from the form are dropped for it (they would override the file).
+        plain = ext in (".png", ".jpg", ".jpeg")
+        if ext in (".tif", ".tiff"):
+            try:
+                from rasterio.io import MemoryFile
+                with MemoryFile(data) as mf, mf.open() as s:
+                    plain = s.crs is None
+            except Exception as e:                  # noqa: BLE001
+                raise ValueError(f"could not read the TIFF: {e}") from e
+        if not plain:
+            gsd, gsd_unknown, gcps = None, False, None
         pts = None
-        if gcps and ext in (".png", ".jpg", ".jpeg"):
+        if gcps and plain:
             import dsm as M
             pts = M.parse_gcps(gcps)
             if len(pts) < 3:
                 raise ValueError(f"{len(pts)} ground control point(s) given: need at least 3")
-        if ext in (".png", ".jpg", ".jpeg") and not (gsd or gsd_unknown or pts):
-            raise ValueError("PNG/JPG has no map information: enter the pixel size, tick "
-                             "'pixel size unknown', or give 3+ ground control points")
+        if plain and not (gsd or gsd_unknown or pts):
+            raise ValueError("this image has no map information (PNG/JPG or a plain TIFF): "
+                             "enter the pixel size, tick 'pixel size unknown', or give 3+ "
+                             "ground control points")
         if not any(m["id"] == model_id for m in list_models(self.models.model_dirs)):
             raise ValueError(f"unknown model '{model_id}'")
         jid = time.strftime("%H%M%S") + "_" + uuid.uuid4().hex[:4]
