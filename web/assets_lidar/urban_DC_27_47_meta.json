@@ -1,0 +1,35 @@
+{
+  "name": "urban_DC_27_47",
+  "width": 512,
+  "height": 512,
+  "gsd_m": 0.6,
+  "gsd_asserted": true,
+  "extent_m": [
+    307.2,
+    307.2
+  ],
+  "h_min": 0.0,
+  "h_max": 24.801000595092773,
+  "h_p99": 19.061683654785156,
+  "source": "prediction",
+  "kind": "ndsm",
+  "has_reference": true,
+  "tile_id": "DC_27_47",
+  "vex_default": 2.0,
+  "reference_name": "LiDAR truth",
+  "image_credit": "GAMUS test tile DC_27_47 (CC BY 4.0)",
+  "model": "DINOv3-SAT head (best.pt, 480 GAMUS train tiles)",
+  "metrics": {
+    "rmse_m": 3.3391336028129808,
+    "mae_m": 2.3329329046978913,
+    "bias_m": 0.09667186721348031,
+    "r": 0.8005146217861208,
+    "n_px": 1048576
+  },
+  "demo": {
+    "landscape": "urban",
+    "truth": "GAMUS AGL: airborne-LiDAR height above ground, 0.3 m (DFC2019 / US3D), shown at 0.6 m",
+    "metrics_at": "full 0.3 m resolution, all valid LiDAR pixels",
+    "chosen": "median per-tile RMSE of the 24 urban test tiles (typical case, not cherry-picked)"
+  }
+}

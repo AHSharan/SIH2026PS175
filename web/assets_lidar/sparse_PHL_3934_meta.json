@@ -1,0 +1,35 @@
+{
+  "name": "sparse_PHL_3934",
+  "width": 512,
+  "height": 512,
+  "gsd_m": 0.6,
+  "gsd_asserted": true,
+  "extent_m": [
+    307.2,
+    307.2
+  ],
+  "h_min": 0.0,
+  "h_max": 80.58436584472656,
+  "h_p99": 10.548707962036133,
+  "source": "prediction",
+  "kind": "ndsm",
+  "has_reference": true,
+  "tile_id": "PHL_3934",
+  "vex_default": 2.0,
+  "reference_name": "LiDAR truth",
+  "image_credit": "GAMUS test tile PHL_3934 (CC BY 4.0)",
+  "model": "DINOv3-SAT head (best.pt, 480 GAMUS train tiles)",
+  "metrics": {
+    "rmse_m": 1.8256169346836293,
+    "mae_m": 0.9447970303302191,
+    "bias_m": 0.436873355180365,
+    "r": 0.8283162089571361,
+    "n_px": 1048576
+  },
+  "demo": {
+    "landscape": "sparse",
+    "truth": "GAMUS AGL: airborne-LiDAR height above ground, 0.3 m (DFC2019 / US3D), shown at 0.6 m",
+    "metrics_at": "full 0.3 m resolution, all valid LiDAR pixels",
+    "chosen": "median per-tile RMSE of the 8 sparse test tiles (typical case, not cherry-picked)"
+  }
+}

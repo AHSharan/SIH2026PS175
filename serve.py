@@ -4,6 +4,11 @@ high-resolution captures straight to disk (shots/). Local only.
     python serve.py          viewer only (no extra dependencies)
     python serve.py --live   also lets the viewer upload an image and run a
                              model on this machine (see live.py)
+    python serve.py --demo-lidar
+                             opens the "real image vs LiDAR truth" demo
+                             (web/assets_lidar, built by
+                             export_viewer.py --lidar-demo). Not part of the
+                             normal flow: without this flag it never appears.
 """
 import argparse
 import base64
@@ -106,7 +111,12 @@ if __name__ == "__main__":
     ap.add_argument("--models-dir", action="append", default=None,
                     help="extra folder with .pt checkpoints (default: dw_run/ckpt and models/)")
     ap.add_argument("--port", type=int, default=8777)
+    ap.add_argument("--demo-lidar", action="store_true",
+                    help="open the real-image vs LiDAR-truth demo (GAMUS test tiles)")
     a = ap.parse_args()
+    if a.demo_lidar and not os.path.exists(os.path.join(ROOT, "assets_lidar", "scenes.json")):
+        raise SystemExit("web/assets_lidar is missing: build it with\n  python export_viewer.py "
+                         "--lidar-demo --root <GAMUS test folder> --pred-dir <predictions>")
     if a.live:
         import live
         if live.dinov3_cached() and not os.environ.get("HF_HUB_OFFLINE"):
@@ -126,4 +136,10 @@ if __name__ == "__main__":
             print(f"[live] model: {m['label']}")
         print(f"[live] open http://localhost:{a.port}/?assets=assets_live")
     print(f"serving {ROOT} on http://localhost:{a.port}  (POST /save -> {SHOTS})")
+    if a.demo_lidar:
+        import threading
+        import webbrowser
+        url = f"http://localhost:{a.port}/?assets=assets_lidar&demo=lidar"
+        print(f"[demo] real image vs LiDAR truth: {url}")
+        threading.Timer(1.0, webbrowser.open, args=(url,)).start()
     ThreadingHTTPServer(("127.0.0.1", a.port), H).serve_forever()

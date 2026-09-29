@@ -43,7 +43,8 @@ no licence to use it is granted except as written below.
    DepthWizard team's own work, including where our work is combined with it.
 
    - GAMUS dataset (Xiong et al., arXiv 2305.14914), CC BY 4.0:
-     web/assets/ (GAMUS test tiles) and images rendered from them
+     web/assets/ and web/assets_lidar/ (GAMUS test tiles; the latter also
+     holds our model's predictions for them) and images rendered from them
      (shots/0*, shots/test_native.jpg, docs/thumbs/gamus_*).
    - Maxar Open Data Program imagery, CC BY-NC 4.0 — WorldView-2, 2022-03-07,
      catalog 10300100CE8D0400: samples/chungthang_wv2.tif and images derived

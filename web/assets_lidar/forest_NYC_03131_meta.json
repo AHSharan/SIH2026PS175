@@ -1,0 +1,35 @@
+{
+  "name": "forest_NYC_03131",
+  "width": 512,
+  "height": 512,
+  "gsd_m": 0.6,
+  "gsd_asserted": true,
+  "extent_m": [
+    307.2,
+    307.2
+  ],
+  "h_min": 0.0,
+  "h_max": 29.964889526367188,
+  "h_p99": 23.748493194580078,
+  "source": "prediction",
+  "kind": "ndsm",
+  "has_reference": true,
+  "tile_id": "NYC_03131",
+  "vex_default": 2.0,
+  "reference_name": "LiDAR truth",
+  "image_credit": "GAMUS test tile NYC_03131 (CC BY 4.0)",
+  "model": "DINOv3-SAT head (best.pt, 480 GAMUS train tiles)",
+  "metrics": {
+    "rmse_m": 5.13755830898375,
+    "mae_m": 3.6581238236537494,
+    "bias_m": -0.1516038818568326,
+    "r": 0.7306704659219119,
+    "n_px": 1048576
+  },
+  "demo": {
+    "landscape": "forest",
+    "truth": "GAMUS AGL: airborne-LiDAR height above ground, 0.3 m (DFC2019 / US3D), shown at 0.6 m",
+    "metrics_at": "full 0.3 m resolution, all valid LiDAR pixels",
+    "chosen": "median per-tile RMSE of the 8 forest test tiles (typical case, not cherry-picked)"
+  }
+}
