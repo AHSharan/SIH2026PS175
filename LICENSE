@@ -47,7 +47,8 @@ no licence to use it is granted except as written below.
      holds our model's predictions for them) and images rendered from them
      (shots/0*, shots/test_native.jpg, docs/thumbs/gamus_*).
    - Maxar Open Data Program imagery, CC BY-NC 4.0 — WorldView-2, 2022-03-07,
-     catalog 10300100CE8D0400: samples/chungthang_wv2.tif and images derived
+     catalog 10300100CE8D0400: samples/chungthang_wv2.tif, samples/chungthang_plain.png
+     (a plain 1024 px crop of it) and images derived
      from it (docs/thumbs/india_*, shots/india_*, shots/live_jpg_result.jpg).
    - Copernicus DEM GLO-30 — (c) DLR e.V. 2010-2014 and (c) Airbus Defence and
      Space GmbH 2014-2018, provided under COPERNICUS by the European Union and

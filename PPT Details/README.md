@@ -34,6 +34,7 @@ repo. "RME" is not a PS metric; if it means mean error, use ME (bias) = −0.52 
 ```
 PPT Details/
 ├── README.md                          this file
+├── video_script.md                    demo video: order, clicks, voice-over
 ├── metrics/
 │   ├── metrics_summary.csv            every metric row, with status and source
 │   └── metrics_summary.md             tables + metric definitions
