@@ -52,10 +52,14 @@ no licence to use it is granted except as written below.
      Space GmbH 2014-2018, provided under COPERNICUS by the European Union and
      ESA: samples/chungthang_glo30.tif and elevation images derived from it.
    - The architecture diagrams in docs/ contain images from the sources above.
+   - USDA NAIP imagery and USGS 3DEP LiDAR (U.S. public domain):
+     samples/park_city_naip2021.tif, samples/park_city_lidar_dsm_2m.tif.
+   - Three.js r169 (MIT, (c) 2010-2024 three.js authors), bundled so the viewer
+     works offline: web/vendor/three/ (its licence: web/vendor/three/LICENSE).
 
    Software downloaded at run time is not part of this repository and remains
    under its own licence: SynRS3D / RS3DAda (MIT), DINOv3 weights (DINOv3
-   License, Meta Platforms), Three.js (MIT), and the Python packages listed in
+   License, Meta Platforms), and the Python packages listed in
    requirements.txt.
 
 6. NO WARRANTY

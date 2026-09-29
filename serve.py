@@ -93,12 +93,19 @@ if __name__ == "__main__":
     a = ap.parse_args()
     if a.live:
         import live
+        if live.dinov3_cached() and not os.environ.get("HF_HUB_OFFLINE"):
+            # weights already on disk: load them without asking the internet,
+            # so the demo works offline and without a token
+            os.environ["HF_HUB_OFFLINE"] = "1"
+            import huggingface_hub.constants as hc      # already imported by the check
+            hc.HF_HUB_OFFLINE = True
         dirs = live.MODEL_DIRS + [os.path.abspath(d) for d in (a.models_dir or [])]
         LIVE = live.Live(dirs)
         env = live.environment()
         print(f"[live] ON  - PyTorch {env['torch'] or 'NOT installed'} · "
               f"GPU: {env['device'] if env['cuda'] else 'none (CPU, slow)'} · "
-              f"HF_TOKEN {'set' if env['hf_token'] else 'not set (needed for DINOv3)'}")
+              + ("DINOv3 on disk (offline OK)" if env["dinov3_cached"] else
+                 f"DINOv3 not downloaded - HF_TOKEN {'set' if env['hf_token'] else 'NOT set (needed once)'}"))
         for m in live.list_models(dirs):
             print(f"[live] model: {m['label']}")
         print(f"[live] open http://localhost:{a.port}/?assets=assets_live")

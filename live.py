@@ -84,9 +84,24 @@ def list_models(model_dirs=None):
     return out
 
 
+DINOV3_REPO = "facebook/dinov3-vitl16-pretrain-sat493m"      # same as train_head.py
+
+
+def dinov3_cached() -> bool:
+    """True when the DINOv3 weights are already downloaded on this machine,
+    so no HF_TOKEN and no internet are needed to load them."""
+    try:
+        from huggingface_hub import try_to_load_from_cache
+        return all(isinstance(try_to_load_from_cache(DINOV3_REPO, f), str)
+                   for f in ("config.json", "model.safetensors"))
+    except Exception:                               # noqa: BLE001
+        return False
+
+
 def environment():
     info = {"torch": False, "cuda": False, "device": "cpu", "hf_token": bool(
-        os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN"))}
+        os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")),
+        "dinov3_cached": dinov3_cached(), "offline": os.environ.get("HF_HUB_OFFLINE") == "1"}
     try:
         import torch
         info["torch"] = torch.__version__
@@ -144,7 +159,8 @@ class Models:
                 try:
                     self.encoder = TH.DinoV3Encoder(log=log)
                 except RuntimeError as e:
-                    raise RuntimeError(f"{e} - set HF_TOKEN before starting serve.py") from e
+                    raise RuntimeError(f"{e} - DINOv3 is not downloaded yet: set HF_TOKEN once "
+                                       "(or run `hf auth login`) and start serve.py again") from e
             head, ck = TH.load_head(path, device=self.encoder.device)
             log(f"[live] {name}: DINOv3 head, epoch {ck.get('epoch')}, on {self.encoder.device}")
             return (TH.make_predict_fn(self.encoder, head), "dinov3",
@@ -317,6 +333,8 @@ class Live:
         return None
 
     def handle_post(self, path, query, body):
+        if path == "/api/validate":
+            return self.validate(query, body)
         if path != "/api/run":
             return None
         if len(body) > MAX_UPLOAD:
@@ -330,3 +348,30 @@ class Live:
             return 200, {"job": job["id"], "scene": job["scene"]}
         except Exception as e:                      # noqa: BLE001
             return 400, {"error": str(e)}
+
+    def validate(self, query, body):
+        """Score a finished run against a reference GeoTIFF (validate.py)."""
+        scene = query.get("scene", "")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", scene):
+            return 400, {"error": "bad scene name"}
+        run_dir = os.path.join(OUT_ROOT, scene)
+        if not os.path.exists(os.path.join(run_dir, "report.json")):
+            return 404, {"error": f"no run output for '{scene}' on this machine: "
+                                  "run the image first, then add the reference"}
+        name = query.get("name", "reference.tif")
+        if not name.lower().endswith((".tif", ".tiff")):
+            return 400, {"error": "the reference must be a GeoTIFF (.tif)"}
+        if len(body) > MAX_UPLOAD:
+            return 413, {"error": "file larger than 1 GB"}
+        d = os.path.join(UPLOADS, "ref_" + time.strftime("%H%M%S") + "_" + uuid.uuid4().hex[:4])
+        os.makedirs(d, exist_ok=True)
+        path = os.path.join(d, re.sub(r"[^A-Za-z0-9_.-]", "_", os.path.basename(name))[:60])
+        with open(path, "wb") as f:
+            f.write(body)
+        try:
+            import validate as V
+            with self.jobs.lock:
+                res = V.validate(run_dir, path, LIVE_ASSETS, scene, ref_name=os.path.basename(name))
+            return 200, res
+        except Exception as e:                      # noqa: BLE001
+            return 400, {"error": f"{type(e).__name__}: {e}"}

@@ -96,7 +96,21 @@ python eval.py --pred preds_zero --gt gamus/test/heights --gt-glob "*_AGL.h5" \
                --auto-buckets-cls gamus/test/classes --tag "B0 floor"
 python export_viewer.py --n 3                     # build viewer assets
 python serve.py                                   # http://localhost:8777
+python serve.py --live                            # + upload an image, run the model,
+                                                  #   score it against a reference
+python validate.py out_dsm/<run> reference.tif   # same scoring from the command line
 ```
+
+**Demo on Windows:** double-click `start_demo.bat`. It starts live mode and opens the
+browser. The viewer's 3D library is bundled (`web/vendor/three/`) and DINOv3 loads from
+disk once downloaded, so the demo needs no internet.
+
+**Checking a run against a reference:** in live mode, after a run, use "Check against a
+reference" (any height GeoTIFF: LiDAR DSM, CartoDEM, survey). It is reprojected onto the
+run's grid and scored raw, after one datum offset, and after offset + scale (fitted on
+half the area, scored on the other half), next to a terrain-only baseline. Try it with
+`samples/park_city_naip2021.tif` + `samples/park_city_lidar_dsm_2m.tif`.
+LiDAR benchmark on 8 US sites: [`results/lidar_benchmark.md`](results/lidar_benchmark.md).
 
 GPU inference runs on Kaggle — see `kaggle_run.py`. Training runs on Colab — see `COLAB.md`.
 
@@ -126,6 +140,7 @@ copyright holders. SIH 2026 organisers and ISRO/SAC evaluators may run it
 solely to evaluate this submission. See [LICENSE](LICENSE).
 
 Third-party material keeps its own licence (details in LICENSE): GAMUS data
-(CC BY 4.0), Maxar Open Data imagery (CC BY-NC 4.0), Copernicus DEM GLO-30.
+(CC BY 4.0), Maxar Open Data imagery (CC BY-NC 4.0), Copernicus DEM GLO-30,
+Three.js (MIT, bundled in `web/vendor/three/` so the viewer works offline).
 Downloaded at run time, not included: SynRS3D / RS3DAda (MIT), DINOv3 weights
-(DINOv3 License, Meta, gated), Three.js (MIT).
+(DINOv3 License, Meta, gated).

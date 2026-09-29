@@ -26,6 +26,11 @@
   #live input[type=file],#live input[type=number]{width:100%;font:inherit;font-size:12px;
     color:var(--fg);background:#1b2434;border:1px solid var(--line);border-radius:6px;padding:5px}
   #live .note{color:var(--dim);font-size:10.5px;margin-top:5px;line-height:1.35}
+  #v-table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:4px}
+  #v-table td,#v-table th{padding:2px 2px;text-align:right;white-space:nowrap}
+  #v-table th{color:var(--dim);font-weight:500}
+  #v-table td:first-child,#v-table th:first-child{text-align:left;white-space:normal}
+  #v-table tr.base td{color:var(--dim)}
   #lv-log{font:10.5px ui-monospace,monospace;color:var(--dim);white-space:pre-wrap;
     max-height:90px;overflow:auto;margin-top:5px}
   #live .bar{height:4px;background:#1b2434;border-radius:2px;margin-top:6px;overflow:hidden}
@@ -147,6 +152,13 @@
   <div class="note" id="lv-st">GeoTIFF gives a real elevation map (terrain added); PNG/JPG
     gives heights above ground only.</div>
   <div id="lv-log"></div>
+  <div id="lv-ref-ui" style="display:none">
+    <h2>Check against a reference</h2>
+    <input type="file" id="lv-ref" accept=".tif,.tiff">
+    <button id="lv-val" style="margin-top:6px">Score this run</button>
+    <div class="note" id="lv-val-st">LiDAR DSM, CartoDEM or any height GeoTIFF of the same
+      area. It is reprojected onto this run's grid automatically.</div>
+  </div>
 </div>
 <div class="panel" id="right">
   <h2>Probe</h2>
@@ -169,6 +181,8 @@
     <div class="kv"><span>RMSE</span><b id="v-rmse">—</b></div>
     <div class="kv"><span>MAE</span><b id="v-mae">—</b></div>
     <div class="kv"><span>Bias</span><b id="v-bias">—</b></div>
+    <table id="v-table"></table>
+    <div class="note" id="v-note" style="color:var(--dim);font-size:10.5px;margin-top:4px"></div>
   </div>
 
   <h2>Performance</h2>
@@ -238,8 +252,8 @@
 
 <script type="importmap">
 {"imports":{
-  "three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  "three":"./vendor/three/three.module.js",
+  "three/addons/":"./vendor/three/"
 }}
 </script>
 <script type="module">
@@ -548,7 +562,10 @@ async function loadScene(name){
     $('v-rmse').textContent=meta.metrics.rmse_m.toFixed(2)+' m';
     $('v-mae').textContent=meta.metrics.mae_m.toFixed(2)+' m';
     $('v-bias').textContent=(meta.metrics.bias_m>=0?'+':'')+meta.metrics.bias_m.toFixed(2)+' m';
+    renderValidation(meta.validation);
   } else $('valblock').style.display='none';
+  $('src-ref').textContent=meta.reference_name?'Reference':'LiDAR truth';
+  if(typeof liveRefUI==='function')liveRefUI();
 
   toolsAvailable();
   buildMesh();
@@ -703,9 +720,23 @@ $('measure').onclick=()=>{
   if(!measuring&&measureLine){scene.remove(measureLine);measureLine=null;}
   if(measuring&&flyMode)$('mode-orbit').onclick();
 };
+function renderValidation(v){
+  const t=$('v-table'), n=$('v-note');
+  if(!v||!v.rows){t.innerHTML='';n.textContent='';return;}
+  const f=x=>x==null||isNaN(x)?'—':x.toFixed(2);
+  t.innerHTML='<tr><th></th><th>RMSE</th><th>MAE</th><th>bias</th><th>r</th></tr>'+
+    v.rows.map(r=>`<tr class="${/no model/.test(r.label)?'base':''}" title="${r.note}">`+
+      `<td>${r.label}</td><td>${f(r.rmse_m)}</td><td>${f(r.mae_m)}</td>`+
+      `<td>${(r.bias_m>=0?'+':'')+f(r.bias_m)}</td><td>${r.r==null||isNaN(r.r)?'—':r.r.toFixed(3)}</td></tr>`).join('');
+  n.textContent=`${v.reference} · ${v.reference_type==='surface'?'surface vs our DSM':
+    'heights above ground vs our nDSM'} · covers ${(v.coverage*100).toFixed(0)}% · `+
+    'shift and affine fitted on half the area, scored on the other half';
+}
 function setBadge(){
   const m=S.meta, b=$('srcbadge');
   let cls='gt', txt='GROUND TRUTH (no model yet)';
+  if(surf==='ref'&&m.reference_name){b.className='badge gt';
+    b.textContent='REFERENCE: '+m.reference_name;return;}
   if(m.kind==='dsm'){cls='pred';txt='DSM = DEM + MODEL nDSM';}
   else if(m.kind==='rdsm'){cls='pred';txt=m.scale_known===false?
     'RELATIVE SHAPE (pixel size unknown)':'RELATIVE DSM (no georeference)';}
@@ -1082,11 +1113,32 @@ async function initLive(){
   const firstFile=ms.find(m=>m.kind==='checkpoint'); if(firstFile)sel.value=firstFile.id;
   $('lv-st').textContent=(env.cuda?'GPU: '+env.device:'No GPU: runs on CPU (slow)')+
     (env.torch?'':' · PyTorch not installed: only Demo works')+
-    (env.hf_token?'':' · HF_TOKEN not set: DINOv3 models will fail');
+    (env.hf_token||env.dinov3_cached?'':' · DINOv3 not downloaded and HF_TOKEN not set: DINOv3 models will fail');
+  $('lv-val').onclick=runValidate;
+  liveRefUI();
   $('lv-file').onchange=()=>{const f=$('lv-file').files[0];
     $('lv-gsd-row').style.display=f&&/\.(png|jpe?g)$/i.test(f.name)?'block':'none';};
   $('lv-unk').onchange=()=>{$('lv-gsd').disabled=$('lv-unk').checked;};
   $('lv-run').onclick=runLive;
+}
+function liveRefUI(){
+  const ok=$('live').style.display!=='none'&&ASSETS==='assets_live'&&S&&S.meta;
+  $('lv-ref-ui').style.display=ok?'block':'none';
+}
+async function runValidate(){
+  const f=$('lv-ref').files[0]; if(!f){toast('Choose a reference GeoTIFF first');return;}
+  const scene=S.meta.name;
+  $('lv-val').disabled=true; $('lv-val-st').textContent='Scoring against '+f.name+'…';
+  let r;
+  try{ r=await (await fetch('api/validate?'+new URLSearchParams({scene,name:f.name}),
+                            {method:'POST',body:f})).json(); }
+  catch(e){ r={error:String(e)}; }
+  $('lv-val').disabled=false;
+  if(r.error){ $('lv-val-st').textContent='Error: '+r.error; return; }
+  const raw=r.rows[0];
+  $('lv-val-st').textContent=`Raw RMSE ${raw.rmse_m.toFixed(2)} m against ${r.reference}. `+
+    'Table on the right; Surface → Error shows where it is wrong.';
+  await loadScene(scene);
 }
 const LV_STEPS=['queued','loading model','reading image','predicting heights','adding terrain',
   'building 3D scene','finishing','done'];

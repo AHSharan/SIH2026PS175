@@ -75,12 +75,11 @@ serving the old code. Then:
 git pull
 ```
 
-```bash
-python serve.py --live
-```
-
-Open **http://localhost:8777/?assets=assets_live** and load the Chungthang scene once, so
-the model is already warm. Keep the finished screenshots in `shots/` open in another
+Then double-click **`start_demo.bat`** in the project folder (or run
+`python serve.py --live`). It opens **http://localhost:8777/?assets=assets_live** by
+itself and needs no internet once DINOv3 has been downloaded (the window says
+"DINOv3 on disk (offline OK)"). Load the Chungthang scene once, so the model is
+already warm. Keep the finished screenshots in `shots/` open in another
 window as a backup.
 
 **On stage:**
@@ -101,8 +100,13 @@ window as a backup.
 5. **Tools → "Flood", drag the level to about +36 m.**
    Say: "At a 36 metre rise, 9 hectares flood and 12 buildings are reached."
 
-6. **(If time) Upload a JPG with the Run button.**
-   Say: "Any plain photo works too — about 2 seconds once the model is loaded."
+6. **Check it against LiDAR, live.** Run panel → choose `samples/park_city_naip2021.tif`
+   → Run. When it opens, "Check against a reference" → choose
+   `samples/park_city_lidar_dsm_2m.tif` → "Score this run", then Surface → "Error".
+   Say: "This is a US aerial photo of a hillside with 160 metres of relief. We score our
+   DSM against airborne LiDAR right here: about 3.3 metres error, against 4.9 for the
+   terrain map alone. The last two rows fit a datum offset and a scale on half the area
+   and score on the other half, so they can't cheat."
 
 7. **Close on the number.**
    Say: "On laser-measured test data: 4.69 metres error, 30 % lower than RS3DAda on the same tiles."
@@ -131,6 +135,12 @@ we recorded this morning". Don't debug in front of judges.
 - **"How do you know the numbers are real?"**
   "Fixed held-out test tiles, the model chosen on a separate validation set, a
   do-nothing baseline on the same tiles (9.35 m), and all code is public on GitHub."
+
+- **"Did you check it against LiDAR?"**
+  "Yes, on 8 US sites with airborne LiDAR, running the full pipeline. Full DSM error:
+  hilly 3.8 m, sparse 3.6 m, residential 5.4 m. Tall downtown towers and dense forest
+  are under-predicted; those are in our limitations. Details in
+  results/lidar_benchmark.md."
 
 - **"Does it work on Cartosat?"**
   "We simulated Cartosat-like 0.3–1 m resolution and our model stayed ahead at every
