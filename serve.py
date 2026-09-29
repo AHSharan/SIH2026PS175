@@ -43,6 +43,22 @@ class H(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         u = urlparse(self.path)
+        if u.path.startswith("/api/file/"):
+            # download one output of a run (whitelisted names only, see live.DOWNLOADS)
+            p = LIVE.file_path(u.path) if LIVE else None
+            if not p:
+                return self._json(404, {"error": "no such file"})
+            with open(p, "rb") as f:
+                data = f.read()
+            scene = u.path.split("/")[3]
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Disposition",
+                             f'attachment; filename="{scene}_{os.path.basename(p)}"')
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return None
         if u.path.startswith("/api/"):
             res = LIVE.handle_get(u.path) if LIVE else (404, {"live": False})
             if res is None:

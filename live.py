@@ -37,6 +37,16 @@ UPLOADS = os.path.join(HERE, "uploads")
 OUT_ROOT = os.path.join(HERE, "out_dsm")
 LIVE_ASSETS = os.path.join(HERE, "web", "assets_live")
 IMAGE_EXT = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
+# run outputs the viewer may offer for download (GET /api/files/<scene>)
+DOWNLOADS = [("dsm.tif", "DSM GeoTIFF", "elevation above sea level (m)"),
+             ("ndsm.tif", "Heights GeoTIFF", "height above ground (m)"),
+             ("dem.tif", "Terrain GeoTIFF", "the DEM on this grid (m)"),
+             ("residual.tif", "Error GeoTIFF", "run minus reference (m)"),
+             ("reference_on_grid.tif", "Reference GeoTIFF", "reference on this grid (m)"),
+             ("rdsm_0to1.png", "Relative shape PNG", "0-1 scaled heights"),
+             ("report.json", "Run report", "every setting and number"),
+             ("validation.json", "Validation", "scores against the reference"),
+             ("SUMMARY.txt", "Summary", "key numbers in plain words")]
 MAX_UPLOAD = 1024 ** 3          # 1 GB
 MAX_SIDE = 4096                 # larger images are centre-cropped to this (reported)
 
@@ -327,6 +337,15 @@ class Live:
             return 200, {"models": [{k: m[k] for k in ("id", "label", "kind")}
                                     for m in list_models(self.models.model_dirs)],
                          "loaded": list(self.models.cache.keys())}
+        if path.startswith("/api/files/"):
+            scene = path.rsplit("/", 1)[1]
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", scene):
+                return 400, {"error": "bad scene name"}
+            d = os.path.join(OUT_ROOT, scene)
+            return 200, {"files": [{"name": n, "label": lab, "what": w,
+                                    "bytes": os.path.getsize(os.path.join(d, n))}
+                                   for n, lab, w in DOWNLOADS
+                                   if os.path.isfile(os.path.join(d, n))]}
         if path.startswith("/api/job/"):
             j = self.jobs.public(path.rsplit("/", 1)[1])
             return (200, j) if j else (404, {"error": "no such job"})
@@ -348,6 +367,16 @@ class Live:
             return 200, {"job": job["id"], "scene": job["scene"]}
         except Exception as e:                      # noqa: BLE001
             return 400, {"error": str(e)}
+
+    def file_path(self, path):
+        """/api/file/<scene>/<name> -> absolute path of an allowed run output, or None."""
+        parts = path.split("/")
+        if len(parts) != 5 or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", parts[3]):
+            return None
+        if parts[4] not in {n for n, _, _ in DOWNLOADS}:
+            return None
+        p = os.path.join(OUT_ROOT, parts[3], parts[4])
+        return p if os.path.isfile(p) else None
 
     def validate(self, query, body):
         """Score a finished run against a reference GeoTIFF (validate.py)."""

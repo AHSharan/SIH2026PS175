@@ -672,9 +672,10 @@ def run(image, out, *, backend="rs3dada", fn=None, window=None, gsd=None,
     if export:
         extra = {"image_credit": source_note, "model": base_tags["MODEL"],
                  "scale_known": scale_known}
+        extra.update(input_px=[int(W), int(H)], input_gsd_m=round(float(in_gsd), 4))
         if kind == "dsm":
             extra.update(dem_credit=report["dem_credit"], caveat=report["caveat"],
-                         vertical_datum=report["vertical_datum"])
+                         vertical_datum=report["vertical_datum"], crs=report["crs"])
         report["viewer"] = export_viewer(export, name, rgb, surf, in_gsd, kind, extra,
                                          ndsm=ndsm if kind == "dsm" else None,
                                          buildings=buildings)

@@ -2,197 +2,228 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>DepthWizard — 3D Terrain Flythrough</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DepthWizard · 3D Terrain Viewer</title>
 <style>
+  /* ------------------------------------------------------------ tokens */
   :root{
-    --bg:#0a0e14; --panel:#131924e6; --line:#243044; --fg:#e6edf7;
-    --dim:#8b9bb4; --accent:#4da3ff; --good:#3ddc97; --warn:#ffb454;
+    --bg:#0a0f17; --panel:#111824e8; --panel2:#0d141f; --line:#223049; --line2:#2d3f5e;
+    --fg:#e8eef8; --dim:#8a9ab3; --faint:#5b6b85;
+    --accent:#4da3ff; --accent2:#2dd4bf; --good:#3ddc97; --warn:#ffb454; --bad:#ff6b6b;
+    --r:12px;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);
     color:var(--fg);font:13px/1.45 ui-sans-serif,system-ui,'Segoe UI',Roboto,sans-serif}
   canvas{display:block}
   #app{position:fixed;inset:0}
+
+  /* ------------------------------------------------------------ panels */
   .panel{position:absolute;background:var(--panel);border:1px solid var(--line);
-    border-radius:10px;backdrop-filter:blur(12px);padding:12px 13px;
-    box-shadow:0 8px 32px #0009}
-  #left{top:14px;left:14px;width:232px}
-  #rcol{position:absolute;top:14px;right:14px;width:212px;display:flex;
-    flex-direction:column;gap:10px;max-height:calc(100% - 28px);overflow-y:auto}
-  #rcol .panel{position:static}
-  #tools .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
-  #tools .note{color:var(--dim);font-size:10.5px;margin-top:5px;line-height:1.35}
-  #tools button:disabled{opacity:.4;cursor:not-allowed}
-  #live input[type=file],#live input[type=number]{width:100%;font:inherit;font-size:12px;
-    color:var(--fg);background:#1b2434;border:1px solid var(--line);border-radius:6px;padding:5px}
-  #live .note{color:var(--dim);font-size:10.5px;margin-top:5px;line-height:1.35}
-  #v-table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:4px}
-  #v-table td,#v-table th{padding:2px 2px;text-align:right;white-space:nowrap}
-  #v-table th{color:var(--dim);font-weight:500}
-  #v-table td:first-child,#v-table th:first-child{text-align:left;white-space:normal}
-  #v-table tr.base td{color:var(--dim)}
-  #lv-log{font:10.5px ui-monospace,monospace;color:var(--dim);white-space:pre-wrap;
-    max-height:90px;overflow:auto;margin-top:5px}
-  #live .bar{height:4px;background:#1b2434;border-radius:2px;margin-top:6px;overflow:hidden}
-  #live .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
-  #bottom{bottom:14px;left:50%;transform:translateX(-50%);
-    display:flex;gap:16px;align-items:center;padding:9px 16px}
-  h1{margin:0 0 2px;font-size:15px;letter-spacing:.2px}
-  .sub{color:var(--dim);font-size:11px;margin-bottom:11px}
-  h2{margin:13px 0 7px;font-size:10.5px;text-transform:uppercase;
-    letter-spacing:.9px;color:var(--dim);font-weight:600}
+    border-radius:var(--r);backdrop-filter:blur(14px);padding:12px 13px;
+    box-shadow:0 10px 36px #000a}
+  .col{position:absolute;top:76px;display:flex;flex-direction:column;gap:10px;
+    max-height:calc(100% - 150px);overflow-y:auto;scrollbar-width:thin;
+    scrollbar-color:var(--line2) transparent}
+  .col .panel{position:static}
+  #lcol{left:14px;width:236px}
+  #rcol{right:14px;width:262px}
+  h2{margin:12px 0 7px;font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.9px;color:var(--dim);font-weight:650;display:flex;
+    justify-content:space-between;align-items:center;gap:6px}
+  .panel>h2:first-child,.panel>div>h2:first-child{margin-top:0}
+  h2 .val{text-transform:none;letter-spacing:0}
+  h2 .hint{text-transform:none;letter-spacing:0;font-weight:400;color:var(--faint)}
   label{display:block;margin:7px 0 3px;color:var(--dim);font-size:11px}
+  .note{color:var(--dim);font-size:10.5px;margin-top:5px;line-height:1.4}
+  .sep{height:1px;background:var(--line);margin:11px -13px}
+
+  /* ------------------------------------------------------------ controls */
   input[type=range]{width:100%;accent-color:var(--accent);margin:0}
-  select,button{width:100%;background:#1b2434;color:var(--fg);
-    border:1px solid var(--line);border-radius:6px;padding:6px 8px;
-    font:inherit;font-size:12px;cursor:pointer}
-  button:hover,select:hover{border-color:var(--accent)}
-  button.active{background:var(--accent);color:#04121f;border-color:var(--accent);
-    font-weight:600}
+  select,button,.btn{width:100%;background:#182233;color:var(--fg);
+    border:1px solid var(--line);border-radius:7px;padding:6px 8px;
+    font:inherit;font-size:12px;cursor:pointer;text-align:center;text-decoration:none;
+    display:block;transition:border-color .15s,background .15s}
+  button:hover,select:hover,.btn:hover{border-color:var(--accent)}
+  button.active{background:var(--accent);color:#04121f;border-color:var(--accent);font-weight:650}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.primary{background:linear-gradient(180deg,#4da3ff,#2f83e6);color:#04121f;
+    border-color:#4da3ff;font-weight:650}
+  input[type=file],input[type=number],textarea{width:100%;font:inherit;font-size:12px;
+    color:var(--fg);background:#182233;border:1px solid var(--line);border-radius:7px;padding:5px}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
-  .kv{display:flex;justify-content:space-between;gap:8px;padding:2.5px 0;
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+  .seg{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);
+    border-radius:8px;overflow:hidden}
+  .seg button{border:none;border-radius:0;border-right:1px solid var(--line);padding:6px 2px;
+    font-size:11.5px}
+  .seg button:last-child{border-right:none}
+  .inline{display:grid;grid-template-columns:1fr 92px;gap:6px;margin-top:6px}
+
+  /* ------------------------------------------------------------ key/value */
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:2.5px 0;
     font-variant-numeric:tabular-nums}
-  .kv span:first-child{color:var(--dim)}
-  .kv b{font-weight:600}
+  .kv span:first-child{color:var(--dim);white-space:nowrap}
+  .kv b{font-weight:600;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .val{color:var(--accent);font-variant-numeric:tabular-nums}
-  kbd{background:#1b2434;border:1px solid var(--line);border-bottom-width:2px;
+  kbd{background:#182233;border:1px solid var(--line);border-bottom-width:2px;
     border-radius:4px;padding:1px 5px;font:11px ui-monospace,monospace}
-  #scalebar{display:flex;flex-direction:column;align-items:center;gap:3px}
-  #sbline{height:5px;border:1px solid var(--fg);border-top:none;width:110px}
-  #compass{width:44px;height:44px;position:relative}
-  #legend{height:9px;border-radius:3px;margin-top:5px;border:1px solid var(--line)}
+
+  /* ------------------------------------------------------------ top bar */
+  #topbar{top:14px;left:14px;right:14px;height:50px;display:flex;align-items:center;
+    gap:18px;padding:0 16px}
+  .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .brand b{font-size:15px;letter-spacing:.2px;display:block}
+  .brand small{color:var(--dim);font-size:10.5px;display:block;white-space:nowrap}
+  #pipe{list-style:none;margin:0 0 0 auto;padding:0;display:flex;align-items:center;gap:4px;
+    overflow:hidden}
+  #pipe li{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:99px;
+    font-size:11.5px;color:var(--faint);border:1px solid transparent;white-space:nowrap}
+  #pipe li i{width:8px;height:8px;border-radius:50%;border:1.5px solid currentColor;flex:none}
+  #pipe li.done{color:var(--fg);background:#3ddc9714;border-color:#3ddc9740}
+  #pipe li.done i{background:var(--good);border-color:var(--good)}
+  #pipe li.todo{color:var(--warn);border-color:#ffb45440;border-style:dashed}
+  #pipe li.skip{text-decoration:line-through;opacity:.55}
+  #pipe .arr{color:var(--faint);font-size:11px}
+
+  /* ------------------------------------------------------------ badges */
+  .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;
+    font-weight:650;letter-spacing:.3px}
+  .badge.gt{background:#ffb45422;color:var(--warn);border:1px solid #ffb45455}
+  .badge.pred{background:#3ddc9722;color:var(--good);border:1px solid #3ddc9755}
+
+  /* ------------------------------------------------------------ legend */
+  #legend{height:9px;border-radius:3px;margin-top:8px;border:1px solid var(--line)}
   .legend-lab{display:flex;justify-content:space-between;color:var(--dim);
     font-size:10px;margin-top:2px;font-variant-numeric:tabular-nums}
+
+  /* ------------------------------------------------------------ live */
+  #lv-log{font:10.5px ui-monospace,monospace;color:var(--dim);white-space:pre-wrap;
+    max-height:90px;overflow:auto;margin-top:5px}
+  #live .bar{height:4px;background:#182233;border-radius:2px;margin-top:7px;overflow:hidden}
+  #live .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));
+    transition:width .4s}
+
+  /* ------------------------------------------------------------ validation */
+  #v-headline{display:flex;align-items:baseline;gap:8px;margin:2px 0 4px}
+  #v-headline b{font-size:22px;font-weight:700;color:var(--good);font-variant-numeric:tabular-nums}
+  #v-headline span{color:var(--dim);font-size:11px}
+  #v-table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:6px;
+    font-variant-numeric:tabular-nums}
+  #v-table td,#v-table th{padding:3px 3px;text-align:right;white-space:nowrap;
+    border-bottom:1px solid #22304980}
+  #v-table th{color:var(--dim);font-weight:500}
+  #v-table td:first-child,#v-table th:first-child{text-align:left;white-space:normal}
+  #v-table tr.base td{color:var(--dim);font-style:italic}
+
+  /* ------------------------------------------------------------ export */
+  #ex-files{display:grid;gap:5px}
+  #ex-files a{display:flex;justify-content:space-between;gap:8px;text-align:left}
+  #ex-files a small{color:var(--dim)}
+
+  /* ------------------------------------------------------------ bottom */
+  #bottom{bottom:14px;left:50%;transform:translateX(-50%);
+    display:flex;gap:16px;align-items:center;padding:8px 16px;white-space:nowrap}
+  #scalebar{display:flex;flex-direction:column;align-items:center;gap:3px}
+  #sbline{height:5px;border:1px solid var(--fg);border-top:none;width:110px}
+  #compass{width:40px;height:40px;position:relative}
+  .perf{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums;
+    border-left:1px solid var(--line);padding-left:14px;line-height:1.6}
+  .perf b{color:var(--fg);font-weight:600}
+
   #crosshair{position:absolute;left:50%;top:50%;width:14px;height:14px;
     margin:-7px 0 0 -7px;pointer-events:none;opacity:0;transition:opacity .2s}
   #crosshair:before,#crosshair:after{content:'';position:absolute;background:#fff9;}
   #crosshair:before{left:6px;top:0;width:2px;height:14px}
   #crosshair:after{top:6px;left:0;height:2px;width:14px}
   body.fly #crosshair{opacity:1}
-  #profile{bottom:14px;right:14px;width:392px;display:none}
-  #profile svg{display:block;width:100%;height:150px;background:#0d131d;border-radius:6px}
+  #profile{bottom:74px;left:50%;transform:translateX(-50%);width:420px;display:none}
+  #profile svg{display:block;width:100%;height:150px;background:var(--panel2);border-radius:7px}
   .lg{display:inline-flex;align-items:center;gap:5px;margin-right:12px;font-size:11px;color:var(--dim)}
   .lg i{width:14px;height:3px;border-radius:2px;display:inline-block}
-  #toast{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);
-    background:#131924f2;border:1px solid var(--line);border-radius:8px;
+  #toast{position:absolute;bottom:84px;left:50%;transform:translateX(-50%);
+    background:#111824f5;border:1px solid var(--line2);border-radius:9px;
     padding:9px 15px;opacity:0;transition:opacity .3s;pointer-events:none;
-    max-width:440px;text-align:center}
+    max-width:460px;text-align:center;z-index:40}
   #toast.show{opacity:1}
-  .badge{display:inline-block;padding:1.5px 7px;border-radius:99px;font-size:10px;
-    font-weight:600;letter-spacing:.3px}
-  .badge.gt{background:#ffb45422;color:var(--warn);border:1px solid #ffb45455}
-  .badge.pred{background:#3ddc9722;color:var(--good);border:1px solid #3ddc9755}
   #loading{position:absolute;inset:0;display:grid;place-items:center;
     background:var(--bg);z-index:50;font-size:13px;color:var(--dim)}
+  @media (max-width:1250px){ #pipe .arr{display:none} #pipe li{padding:5px 7px} }
+  @media (max-width:1050px){ .brand small{display:none} }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <div id="crosshair"></div>
-<div id="loading">building terrain…</div>
+<div id="loading">Building terrain…</div>
 
+<!-- top bar: brand + where this scene is in the pipeline (filled by setPipeline) -->
+<header class="panel" id="topbar">
+  <div class="brand">
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+      <rect width="30" height="30" rx="8" fill="#16233a"/>
+      <path d="M4 22 L11 12 L15 17 L19 9 L26 22 Z" fill="#4da3ff"/>
+      <path d="M4 22 L11 12 L15 17 L19 9 L26 22" fill="none" stroke="#2dd4bf" stroke-width="1.4"/>
+      <rect x="4" y="22" width="22" height="2" rx="1" fill="#2dd4bf"/>
+    </svg>
+    <div><b>DepthWizard</b><small>Single image to metric 3D · SIH 2026 · PS 26175</small></div>
+  </div>
+  <ol id="pipe">
+    <li id="pp-img" title="Input image"><i></i>Image</li><span class="arr">›</span>
+    <li id="pp-model" title="Height model"><i></i>Model</li><span class="arr">›</span>
+    <li id="pp-dem" title="Terrain (DEM) added under the heights"><i></i>Terrain</li><span class="arr">›</span>
+    <li id="pp-dsm" title="Final surface model"><i></i>DSM</li><span class="arr">›</span>
+    <li id="pp-val" title="Scored against a reference"><i></i>Validated</li><span class="arr">›</span>
+    <li id="pp-exp" title="Files and 3D model to download"><i></i>Export</li>
+  </ol>
+</header>
+
+<!-- ================================================================ left -->
+<div class="col" id="lcol">
 <div class="panel" id="left">
-  <h1>DepthWizard</h1>
-  <div class="sub">Single-view height → 3D flythrough</div>
-
   <h2>Scene</h2>
   <select id="scene"></select>
-  <div style="margin-top:7px"><span id="srcbadge" class="badge gt">—</span></div>
+  <div style="margin-top:8px"><span id="srcbadge" class="badge gt">-</span></div>
   <div class="row" id="srcrow" style="display:none">
     <button id="src-pred" class="active">Model</button>
     <button id="src-ref">LiDAR truth</button>
   </div>
 
   <h2>Surface</h2>
-  <div class="row">
-    <button data-mode="tex" class="active">Texture</button>
+  <div class="seg">
+    <button data-mode="tex" class="active">Photo</button>
     <button data-mode="height">Height</button>
     <button data-mode="slope">Slope</button>
     <button data-mode="error" id="btn-error">Error</button>
   </div>
+  <div class="inline">
+    <button id="t-cont" title="Draw elevation contour lines on any surface">Contours</button>
+    <select id="cont-int" title="Contour interval">
+      <option value="auto">auto</option><option>1</option><option>2</option><option>5</option>
+      <option>10</option><option>20</option><option>50</option>
+    </select>
+  </div>
+  <div class="note" id="cont-note" style="display:none"></div>
   <div id="legend"></div>
-  <div class="legend-lab"><span id="lmin">—</span><span id="lmax">—</span></div>
+  <div class="legend-lab"><span id="lmin">-</span><span id="lmax">-</span></div>
 
   <h2>Vertical exaggeration <span class="val" id="vexv">2.0×</span></h2>
   <input type="range" id="vex" min="0.5" max="8" step="0.1" value="2">
-
   <h2>Sun azimuth <span class="val" id="sazv">135°</span></h2>
   <input type="range" id="saz" min="0" max="360" step="1" value="135">
   <h2>Sun elevation <span class="val" id="selv">42°</span></h2>
   <input type="range" id="sel" min="5" max="89" step="1" value="42">
 
-  <h2>Navigation</h2>
-  <div class="row">
+  <h2>Navigate</h2>
+  <div class="row" style="margin-top:0">
     <button id="mode-fly" class="active">Fly</button>
     <button id="mode-orbit">Orbit</button>
   </div>
   <button id="measure" style="margin-top:6px">Measure distance</button>
 </div>
 
-<div id="rcol">
-<div class="panel" id="live" style="display:none">
-  <h2 style="margin-top:0">Run a model <span style="text-transform:none;letter-spacing:0">(live)</span></h2>
-  <input type="file" id="lv-file" accept=".tif,.tiff,.png,.jpg,.jpeg">
-  <label for="lv-model">Model</label>
-  <select id="lv-model"></select>
-  <div id="lv-gsd-row" style="display:none">
-    <label for="lv-gsd">Pixel size (m) - PNG/JPG only</label>
-    <input type="number" id="lv-gsd" min="0.05" max="5" step="0.05" value="0.5">
-    <label style="display:flex;gap:6px;align-items:center;margin-top:6px">
-      <input type="checkbox" id="lv-unk" style="width:auto"> I don't know the pixel size</label>
-    <label for="lv-gcp">Map points (optional, 3 or more)</label>
-    <textarea id="lv-gcp" rows="3" placeholder="x_px, y_px, lat, lon&#10;one point per line"
-      style="width:100%;font:11px ui-monospace,monospace;color:var(--fg);background:#1b2434;
-      border:1px solid var(--line);border-radius:6px;padding:5px;resize:vertical"></textarea>
-    <div class="note">With 3+ points (pixel position from Paint, lat/lon from Google
-      Maps) the image is placed on the map: full elevation above sea level.</div>
-  </div>
-  <button id="lv-run" style="margin-top:8px">Run</button>
-  <div class="bar"><i id="lv-bar"></i></div>
-  <div class="note" id="lv-st">GeoTIFF gives a real elevation map (terrain added); PNG/JPG
-    gives heights above ground only.</div>
-  <div id="lv-log"></div>
-  <div id="lv-ref-ui" style="display:none">
-    <h2>Check against a reference</h2>
-    <input type="file" id="lv-ref" accept=".tif,.tiff">
-    <button id="lv-val" style="margin-top:6px">Score this run</button>
-    <div class="note" id="lv-val-st">LiDAR DSM, CartoDEM or any height GeoTIFF of the same
-      area. It is reprojected onto this run's grid automatically.</div>
-  </div>
-</div>
-<div class="panel" id="right">
-  <h2>Probe</h2>
-  <div class="kv"><span id="p-hl">Height</span><b id="p-h">—</b></div>
-  <div class="kv" id="p-ag-row" style="display:none">
-    <span>Above ground</span><b id="p-ag">—</b></div>
-  <div class="kv"><span>Slope</span><b id="p-s">—</b></div>
-  <div class="kv"><span>X / Y</span><b id="p-xy">—</b></div>
-  <div class="kv" id="p-b-row" style="display:none"><span>Building</span><b id="p-b">—</b></div>
-  <div class="kv" id="p-err-row" style="display:none">
-    <span>Error</span><b id="p-e">—</b></div>
-
-  <h2>Scene stats</h2>
-  <div class="kv"><span>Extent</span><b id="s-ext">—</b></div>
-  <div class="kv"><span>GSD</span><b id="s-gsd">—</b></div>
-  <div class="kv"><span id="s-maxl">Max height</span><b id="s-max">—</b></div>
-
-  <div id="valblock" style="display:none">
-    <h2>Validation vs reference</h2>
-    <div class="kv"><span>RMSE</span><b id="v-rmse">—</b></div>
-    <div class="kv"><span>MAE</span><b id="v-mae">—</b></div>
-    <div class="kv"><span>Bias</span><b id="v-bias">—</b></div>
-    <table id="v-table"></table>
-    <div class="note" id="v-note" style="color:var(--dim);font-size:10.5px;margin-top:4px"></div>
-  </div>
-
-  <h2>Performance</h2>
-  <div class="kv"><span>FPS</span><b id="fps">—</b></div>
-  <div class="kv"><span>Vertices</span><b id="verts">—</b></div>
-  <div class="kv"><span>Eye alt.</span><b id="alt">—</b></div>
-</div>
-
 <div class="panel" id="tools">
-  <h2 style="margin-top:0">Tools <span style="text-transform:none;letter-spacing:0">(optional)</span></h2>
+  <h2>Tools <span class="hint">optional</span></h2>
   <div class="row3">
     <button id="t-flood" title="Raise a water level through the valley (DSM scenes)">Flood</button>
     <button id="t-bld" title="Show candidate buildings with estimated floors (DSM scenes)">Buildings</button>
@@ -201,19 +232,19 @@
   <div id="flood-ui" style="display:none">
     <h2>Water level <span class="val" id="fl-v">+0.0 m</span></h2>
     <input type="range" id="fl" min="0" max="40" step="0.5" value="0">
-    <div class="kv"><span>Water elevation</span><b id="fl-el">—</b></div>
-    <div class="kv"><span>Flooded area</span><b id="fl-a">—</b></div>
-    <div class="kv" id="fl-b-row"><span>Buildings reached</span><b id="fl-b">—</b></div>
-    <div class="kv" id="fl-d-row"><span>… water &gt; 1 m deep</span><b id="fl-d">—</b></div>
+    <div class="kv"><span>Water elevation</span><b id="fl-el">-</b></div>
+    <div class="kv"><span>Flooded area</span><b id="fl-a">-</b></div>
+    <div class="kv" id="fl-b-row"><span>Buildings reached</span><b id="fl-b">-</b></div>
+    <div class="kv" id="fl-d-row"><span>Water over 1 m deep</span><b id="fl-d">-</b></div>
     <div class="note">Level above the lowest ground in view (the river). Simple "bathtub"
       screening: everything below the level is wet; no river flow. Heights carry
       the model's few-metre error.</div>
   </div>
   <div id="bld-ui" style="display:none">
-    <div class="kv" style="margin-top:6px"><span>Candidate buildings</span><b id="b-n">—</b></div>
+    <div class="kv" style="margin-top:6px"><span>Candidate buildings</span><b id="b-n">-</b></div>
     <div id="b-hist" class="note"></div>
     <div class="note">Found from the model's height above ground, trees removed by
-      colour + texture. Floors ≈ height ÷ 3 m. Estimates, not survey data.
+      colour and texture. Floors are height ÷ 3 m. Estimates, not survey data.
       Click a roof in Orbit mode for its details.</div>
   </div>
   <div id="tour-ui" style="display:none">
@@ -227,22 +258,101 @@
 </div>
 </div>
 
-<div class="panel" id="bottom">
-  <div id="scalebar"><span id="sbtxt" style="font-size:11px">—</span>
-    <div id="sbline"></div></div>
-  <svg id="compass" viewBox="0 0 44 44">
-    <circle cx="22" cy="22" r="20" fill="none" stroke="#243044"/>
-    <g id="needle"><path d="M22 6 L26 24 L22 21 L18 24 Z" fill="#4da3ff"/></g>
-    <text x="22" y="5" fill="#8b9bb4" font-size="8" text-anchor="middle">N</text>
-  </svg>
-  <div style="font-size:11px;color:var(--dim);line-height:1.7">
-    <kbd>click</kbd> look · <kbd>W A S D</kbd> move · <kbd>Q E</kbd> alt ·
-    <kbd>shift</kbd> boost · <kbd>esc</kbd> release
+<!-- ================================================================ right -->
+<div class="col" id="rcol">
+<div class="panel" id="live" style="display:none">
+  <h2>Run a model <span class="hint">on this computer</span></h2>
+  <input type="file" id="lv-file" accept=".tif,.tiff,.png,.jpg,.jpeg">
+  <label for="lv-model">Model</label>
+  <select id="lv-model"></select>
+  <div id="lv-gsd-row" style="display:none">
+    <label for="lv-gsd">Pixel size (m), PNG/JPG only</label>
+    <input type="number" id="lv-gsd" min="0.05" max="5" step="0.05" value="0.5">
+    <label style="display:flex;gap:6px;align-items:center;margin-top:6px">
+      <input type="checkbox" id="lv-unk" style="width:auto"> I don't know the pixel size</label>
+    <label for="lv-gcp">Map points (optional, 3 or more)</label>
+    <textarea id="lv-gcp" rows="3" placeholder="x_px, y_px, lat, lon&#10;one point per line"
+      style="font:11px ui-monospace,monospace;resize:vertical"></textarea>
+    <div class="note">With 3+ points (pixel position from Paint, lat/lon from Google
+      Maps) the image is placed on the map: full elevation above sea level.</div>
+  </div>
+  <button id="lv-run" class="primary" style="margin-top:9px">Run</button>
+  <div class="bar"><i id="lv-bar"></i></div>
+  <div class="note" id="lv-st">GeoTIFF gives a real elevation map (terrain added); PNG/JPG
+    gives heights above ground only.</div>
+  <div id="lv-log"></div>
+  <div id="lv-ref-ui" style="display:none">
+    <div class="sep"></div>
+    <h2>Check against a reference</h2>
+    <input type="file" id="lv-ref" accept=".tif,.tiff">
+    <button id="lv-val" style="margin-top:6px">Score this run</button>
+    <div class="note" id="lv-val-st">LiDAR DSM, CartoDEM or any height GeoTIFF of the same
+      area. It is reprojected onto this run's grid automatically.</div>
   </div>
 </div>
 
+<div class="panel" id="valblock" style="display:none">
+  <h2>Accuracy vs reference</h2>
+  <div id="v-headline"><b id="v-rmse">-</b><span>RMSE, nothing removed</span></div>
+  <div class="kv"><span>MAE</span><b id="v-mae">-</b></div>
+  <div class="kv"><span>Bias</span><b id="v-bias">-</b></div>
+  <table id="v-table"></table>
+  <div class="note" id="v-note"></div>
+</div>
+
+<div class="panel" id="right">
+  <h2>Scene info</h2>
+  <div class="kv"><span>Image</span><b id="i-src">-</b></div>
+  <div class="kv"><span>Model</span><b id="i-model">-</b></div>
+  <div class="kv"><span>Output</span><b id="i-out">-</b></div>
+  <div class="kv" id="i-crs-row"><span>Map projection</span><b id="i-crs">-</b></div>
+  <div class="kv"><span>Pixel size</span><b id="s-gsd">-</b></div>
+  <div class="kv" id="i-px-row"><span>Image size</span><b id="i-px">-</b></div>
+  <div class="kv"><span>Extent</span><b id="s-ext">-</b></div>
+  <div class="kv"><span id="s-maxl">Max height</span><b id="s-max">-</b></div>
+  <div class="kv" id="i-dem-row"><span>Terrain</span><b id="i-dem">-</b></div>
+  <div class="kv" id="i-datum-row"><span>Vertical datum</span><b id="i-datum">-</b></div>
+  <div class="kv"><span>Validation</span><b id="i-val">-</b></div>
+
+  <h2>Probe <span class="hint">Orbit mode: click the terrain</span></h2>
+  <div class="kv"><span id="p-hl">Height</span><b id="p-h">-</b></div>
+  <div class="kv" id="p-ag-row" style="display:none">
+    <span>Above ground</span><b id="p-ag">-</b></div>
+  <div class="kv"><span>Slope</span><b id="p-s">-</b></div>
+  <div class="kv"><span>X / Y</span><b id="p-xy">-</b></div>
+  <div class="kv" id="p-b-row" style="display:none"><span>Building</span><b id="p-b">-</b></div>
+  <div class="kv" id="p-err-row" style="display:none">
+    <span>Error</span><b id="p-e">-</b></div>
+</div>
+
+<div class="panel" id="export">
+  <h2>Export</h2>
+  <div id="ex-files"></div>
+  <div class="row">
+    <button id="ex-glb" title="Textured 3D model at true scale (metres), opens in Blender, Windows 3D Viewer, etc.">3D model (.glb)</button>
+    <button id="ex-png" title="Save the current 3D view as an image">Screenshot</button>
+  </div>
+  <div class="note" id="ex-st">GeoTIFFs keep the map position and open in QGIS or ArcGIS.</div>
+</div>
+</div>
+
+<div class="panel" id="bottom">
+  <div id="scalebar"><span id="sbtxt" style="font-size:11px">-</span>
+    <div id="sbline"></div></div>
+  <svg id="compass" viewBox="0 0 44 44">
+    <circle cx="22" cy="22" r="20" fill="none" stroke="#223049"/>
+    <g id="needle"><path d="M22 6 L26 24 L22 21 L18 24 Z" fill="#4da3ff"/></g>
+    <text x="22" y="5" fill="#8a9ab3" font-size="8" text-anchor="middle">N</text>
+  </svg>
+  <div style="font-size:11px;color:var(--dim);line-height:1.7">
+    <kbd>click</kbd> look · <kbd>W A S D</kbd> move · <kbd>Q E</kbd> altitude ·
+    <kbd>shift</kbd> fast · <kbd>esc</kbd> release
+  </div>
+  <div class="perf"><b id="fps">-</b> fps · <b id="verts">-</b> vertices · eye <b id="alt">-</b></div>
+</div>
+
 <div class="panel" id="profile">
-  <h2 style="margin-top:0">Height profile <span class="val" id="prof-d"></span></h2>
+  <h2>Height profile <span class="val" id="prof-d"></span></h2>
   <svg id="prof-svg" viewBox="0 0 360 150" preserveAspectRatio="none"></svg>
   <div id="prof-leg" style="margin-top:6px"></div>
   <div id="prof-stat" style="font-size:11.5px;margin-top:3px;font-variant-numeric:tabular-nums"></div>
@@ -259,6 +369,7 @@
 <script type="module">
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 
 const $=id=>document.getElementById(id);
 let ASSETS=new URLSearchParams(location.search).get('assets')||'assets';
@@ -353,7 +464,8 @@ function buildMesh(){
     roughness:0.93, metalness:0.0, flatShading:false
   });
   if(mode!=='tex'){ applyColors(geo,N); }
-  else { if(S.hag) applyWallnessHAG(geo,N); else applyWallness(geo); wallShader(mat); }
+  else { if(S.hag) applyWallnessHAG(geo,N); else applyWallness(geo); }
+  surfaceShader(mat, mode==='tex');
 
   mesh=new THREE.Mesh(geo,mat);
   mesh.castShadow=mesh.receiveShadow=true;
@@ -427,21 +539,37 @@ function applyWallnessHAG(geo,N){
   geo.setAttribute('wallness',new THREE.BufferAttribute(w,1));
   geo.setAttribute('hag',new THREE.BufferAttribute(hg,1));
 }
-function wallShader(mat){
+// One shader patch for every surface mode.
+//  walls=true (photo mode): facade shading, see applyWallness above.
+//  contours: elevation lines every C.step metres, drawn in the fragment
+//  shader from the true elevation (mesh height / exaggeration + base), with
+//  every 5th line thicker. fwidth() keeps them 1-2 px wide at any zoom.
+const C={on:false,pick:'auto'};
+function contourStep(){
+  if(C.pick!=='auto')return +C.pick;
+  const relief=Math.max(1,(S.meta.h_p99||S.meta.h_max)-(S.meta.h_min||0));
+  const nice=[0.5,1,2,5,10,20,25,50,100,200];
+  return nice.find(v=>relief/v<=14)||200;            // about 8-14 lines across the scene
+}
+function surfaceShader(mat,walls){
   mat.onBeforeCompile=sh=>{
-    sh.vertexShader=`attribute float wallness;
-attribute float hag;
-varying float vWall;
-varying float vWorldY;
+    sh.uniforms.uVex={value:vex};
+    sh.uniforms.uBase={value:base()};
+    sh.uniforms.uContour={value:C.on?contourStep():0.0};
+    sh.vertexShader=`uniform float uVex;
+uniform float uBase;
+varying float vElev;
+${walls?'attribute float wallness;\nattribute float hag;\nvarying float vWall;\nvarying float vWorldY;':''}
 ` + sh.vertexShader.replace('#include <begin_vertex>',
         `#include <begin_vertex>
+  vElev = transformed.y / uVex + uBase;${walls?`
   vWall = wallness;
-  vWorldY = hag;`);
-    sh.fragmentShader=`varying float vWall;
-varying float vWorldY;
-uniform float uHMax;
-uniform float uTint;
-` + sh.fragmentShader.replace('#include <map_fragment>',
+  vWorldY = hag;`:''}`);
+    let fs=`uniform float uContour;
+varying float vElev;
+${walls?'varying float vWall;\nvarying float vWorldY;\nuniform float uHMax;\nuniform float uTint;':''}
+` + sh.fragmentShader;
+    if(walls) fs=fs.replace('#include <map_fragment>',
         `#include <map_fragment>
   // facades: darker near the ground, lighter toward the roofline, so a wall
   // reads as a wall instead of a flat blown-out slab
@@ -452,13 +580,34 @@ uniform float uTint;
   // colour, darkened, so the scene still reads as the real place.
   vec3 tinted = diffuseColor.rgb * mix(0.55, 0.85, hfrac);
   diffuseColor.rgb = mix(diffuseColor.rgb, mix(grey, tinted, uTint), clamp(vWall,0.0,1.0));`);
-    sh.uniforms.uHMax={value:(!S?40.0:(S.hag?(S.meta.ndsm_p99||10)*vex
-                                            :(S.meta.h_p99-base())*vex))};
-    sh.uniforms.uTint={value:(S&&S.meta.source==='prediction'&&surf!=='ref')?1.0:0.0};
+    fs=fs.replace('#include <color_fragment>',
+        `#include <color_fragment>
+  if (uContour > 0.0) {
+    float e = vElev / uContour;
+    float d = abs(fract(e - 0.5) - 0.5) / max(fwidth(e), 1e-4);   // distance to line, px
+    float major = 1.0 - step(0.5, abs(mod(floor(e + 0.5), 5.0)));  // every 5th line
+    float line = 1.0 - smoothstep(0.0, 1.0 + 0.9 * major, d);
+    ${walls?'line *= 1.0 - clamp(vWall, 0.0, 1.0);   // not across building walls':''}
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.05, 0.08), line * (0.6 + 0.3 * major));
+  }`);
+    sh.fragmentShader=fs;
+    if(walls){
+      sh.uniforms.uHMax={value:(!S?40.0:(S.hag?(S.meta.ndsm_p99||10)*vex
+                                              :(S.meta.h_p99-base())*vex))};
+      sh.uniforms.uTint={value:(S&&S.meta.source==='prediction'&&surf!=='ref')?1.0:0.0};
+    }
     mat.userData.sh=sh;
   };
-  mat.customProgramCacheKey=()=>'wall';
+  mat.customProgramCacheKey=()=>walls?'wall':'plain';
 }
+function updateContourUI(){
+  $('t-cont').classList.toggle('active',C.on);
+  $('cont-note').style.display=C.on&&S?'block':'none';
+  if(C.on&&S)$('cont-note').textContent=`Contour lines every ${contourStep()} m `+
+    `(thick line every ${5*contourStep()} m)`+(S.meta.kind==='dsm'?', above sea level':'');
+}
+$('t-cont').onclick=()=>{ if(!S)return; C.on=!C.on; updateContourUI(); buildMesh(); };
+$('cont-int').onchange=e=>{ C.pick=e.target.value; if(!C.on)C.on=true; updateContourUI(); buildMesh(); };
 
 function applyColors(geo,N){
   const {W,H}=S, n=N*N, col=new Float32Array(n*3);
@@ -549,10 +698,7 @@ async function loadScene(name){
   $('profile').style.display='none';
   setBadge();
 
-  $('s-ext').textContent=`${meta.extent_m[0].toFixed(0)}×${meta.extent_m[1].toFixed(0)} m`;
-  $('s-gsd').textContent=meta.gsd_m+' m'+(meta.gsd_asserted?'*':'');
-  $('s-maxl').textContent=meta.kind==='dsm'?'Max elevation':'Max height';
-  $('s-max').textContent=meta.h_max.toFixed(1)+' m';
+  setInfo(); setPipeline(); fillExport(); updateContourUI();
 
   $('btn-error').disabled=!ref;
   $('btn-error').style.opacity=ref?1:0.4;
@@ -560,6 +706,8 @@ async function loadScene(name){
   if(meta.metrics){
     $('valblock').style.display='block';
     $('v-rmse').textContent=meta.metrics.rmse_m.toFixed(2)+' m';
+    $('v-headline').querySelector('span').textContent=meta.validation?
+      'RMSE vs '+meta.reference_name+', nothing removed':'RMSE vs LiDAR, nothing removed';
     $('v-mae').textContent=meta.metrics.mae_m.toFixed(2)+' m';
     $('v-bias').textContent=(meta.metrics.bias_m>=0?'+':'')+meta.metrics.bias_m.toFixed(2)+' m';
     renderValidation(meta.validation);
@@ -606,6 +754,7 @@ document.querySelectorAll('[data-mode]').forEach(btn=>{
     mode=btn.dataset.mode;
     document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b===btn));
     $('legend').style.display=mode==='tex'?'none':'block';
+    document.querySelector('.legend-lab').style.display=mode==='tex'?'none':'flex';
     buildMesh();
   };
 });
@@ -652,11 +801,11 @@ addEventListener('mousemove',e=>{
 });
 $('mode-fly').onclick=()=>{flyMode=true;orbit.enabled=false;
   $('mode-fly').classList.add('active');$('mode-orbit').classList.remove('active');
-  toast('Fly mode — click to capture mouse, WASD to move');};
+  toast('Fly mode: click to capture the mouse, then W A S D to move');};
 $('mode-orbit').onclick=()=>{flyMode=false;orbit.enabled=true;
   document.exitPointerLock?.();
   $('mode-orbit').classList.add('active');$('mode-fly').classList.remove('active');
-  toast('Orbit mode — drag to rotate, click terrain to probe height');};
+  toast('Orbit mode: drag to rotate, click the terrain to probe its height');};
 
 function flyStep(dt){
   if(!flyMode)return;
@@ -716,21 +865,113 @@ function probe(e){
 $('measure').onclick=()=>{
   measuring=!measuring; measurePts=[];
   $('measure').classList.toggle('active',measuring);
-  $('measure').textContent=measuring?'Measuring — click 2 points':'Measure distance';
+  $('measure').textContent=measuring?'Measuring: click 2 points':'Measure distance';
   if(!measuring&&measureLine){scene.remove(measureLine);measureLine=null;}
   if(measuring&&flyMode)$('mode-orbit').onclick();
 };
+/* ------------------------------------------------ scene info, pipeline, export */
+const short=(s,n=26)=>s&&s.length>n?s.slice(0,n-1)+'…':(s||'-');
+function setInfo(){
+  const m=S.meta, show=(id,on)=>{$(id).style.display=on?'flex':'none';};
+  const src=(m.image_credit||'').replace(/^uploaded:\s*/,'')||m.tile_id||m.name;
+  $('i-src').textContent=short(src); $('i-src').title=m.image_credit||src;
+  $('i-model').textContent=short(m.model||(m.source==='prediction'?'height model':'none, LiDAR scene'));
+  $('i-model').title=m.model||'';
+  $('i-out').textContent=m.kind==='dsm'?'DSM = terrain + heights':
+    m.kind==='rdsm'?(m.scale_known===false?'Relative shape only':'Heights above ground'):
+    (m.source==='prediction'?'Heights above ground':'LiDAR heights');
+  show('i-crs-row',!!m.crs); $('i-crs').textContent=short(m.crs||'',20); $('i-crs').title=m.crs||'';
+  $('s-gsd').textContent=(m.input_gsd_m?m.input_gsd_m+' m':m.gsd_m+' m'+(m.gsd_asserted?'*':''))+
+    (m.input_gsd_m&&Math.abs(m.input_gsd_m-m.gsd_m)>1e-3?` (3D: ${m.gsd_m} m)`:'');
+  show('i-px-row',!!m.input_px); if(m.input_px)$('i-px').textContent=`${m.input_px[0]} × ${m.input_px[1]} px`;
+  $('s-ext').textContent=`${m.extent_m[0].toFixed(0)} × ${m.extent_m[1].toFixed(0)} m`;
+  $('s-maxl').textContent=m.kind==='dsm'?'Elevation':'Max height';
+  $('s-max').textContent=m.kind==='dsm'?`${m.h_min.toFixed(0)} to ${m.h_max.toFixed(0)} m`:m.h_max.toFixed(1)+' m';
+  show('i-dem-row',!!m.dem_credit);
+  $('i-dem').textContent=/copernicus/i.test(m.dem_credit||'')?'Copernicus GLO-30':short(m.dem_credit||'');
+  $('i-dem').title=m.dem_credit||'';
+  show('i-datum-row',!!m.vertical_datum);
+  $('i-datum').textContent=/EGM2008/.test(m.vertical_datum||'')?'EGM2008 geoid':short(m.vertical_datum||'');
+  $('i-datum').title=m.vertical_datum||'';
+  $('i-val').textContent=m.metrics?`RMSE ${m.metrics.rmse_m.toFixed(2)} m`:'not checked yet';
+  $('i-val').style.color=m.metrics?'var(--good)':'var(--warn)';
+}
+function setPipeline(){
+  const m=S.meta, pred=m.source==='prediction';
+  const st={img:'done', model:pred?'done':'skip', dem:m.kind==='dsm'?'done':'skip',
+            dsm:m.kind==='dsm'?'done':'skip', val:m.metrics?'done':(pred?'todo':'skip'),
+            exp:'done'};
+  const tips={img:m.image_credit||m.tile_id||m.name, model:m.model||'',
+    dem:m.dem_credit||'No map position, so no terrain can be added',
+    dsm:m.kind==='dsm'?'Terrain + model heights':'Heights above ground only',
+    val:m.metrics?`RMSE ${m.metrics.rmse_m.toFixed(2)} m against `+(m.reference_name||'LiDAR'):
+      'Not scored yet: add a reference GeoTIFF', exp:'GeoTIFF, 3D model and report'};
+  for(const k in st){const li=$('pp-'+k); li.className=st[k]; li.title=tips[k];}
+  $('pp-val').lastChild.textContent=m.metrics?`Validated ${m.metrics.rmse_m.toFixed(1)} m`:'Validated';
+}
+async function fillExport(){
+  const box=$('ex-files'); box.innerHTML='';
+  if(ASSETS!=='assets_live'){ $('ex-st').textContent='3D model and screenshot of this scene. '+
+    'GeoTIFF downloads appear for runs made on this computer.'; return; }
+  let r=null;
+  try{ r=await (await fetch('api/files/'+encodeURIComponent(S.meta.name),{cache:'no-store'})).json(); }
+  catch(e){ r=null; }
+  if(!r||!r.files||!r.files.length){ $('ex-st').textContent='Run files are not on this computer.'; return; }
+  const kb=b=>b>=1e6?(b/1e6).toFixed(1)+' MB':Math.max(1,Math.round(b/1e3))+' KB';
+  box.innerHTML=r.files.map(f=>`<a class="btn" href="api/file/${encodeURIComponent(S.meta.name)}/${f.name}" `+
+    `title="${f.what}" download><span>${f.label}</span><small>${kb(f.bytes)}</small></a>`).join('');
+  $('ex-st').textContent='GeoTIFFs keep the map position and open in QGIS or ArcGIS.';
+}
+function saveBlob(blob,name){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);
+}
+// Textured mesh at TRUE scale (metres, no exaggeration), 512 x 512 vertices.
+// Origin: scene centre at the lowest elevation in view (stored in extras).
+async function exportGLB(){
+  if(!S)return;
+  $('ex-glb').disabled=true; $('ex-st').textContent='Building the 3D model…';
+  try{
+    const {W,H,gsd}=S, EX=W*gsd, EY=H*gsd, N=Math.min(512,W,H), B=base();
+    const geo=new THREE.PlaneGeometry(EX,EY,N-1,N-1); geo.rotateX(-Math.PI/2);
+    const pos=geo.attributes.position;
+    for(let j=0;j<N;j++){const sy=Math.min(H-1,Math.round(j*(H-1)/(N-1)));
+      for(let i=0;i<N;i++){const sx=Math.min(W-1,Math.round(i*(W-1)/(N-1)));
+        pos.setY(j*N+i,S.heights[sy*W+sx]-B);}}
+    geo.computeVertexNormals();
+    texMap.userData.mimeType='image/jpeg';            // PNG would make the file ~4x larger
+    const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:texMap,roughness:0.95,metalness:0}));
+    m.name=S.meta.name;
+    m.userData={generator:'DepthWizard', units:'metres', vertical_exaggeration:1,
+      elevation_of_y0_m:B, surface:surf==='ref'?'reference':'model', kind:S.meta.kind,
+      crs:S.meta.crs||null, pixel_size_m:gsd, extent_m:[EX,EY]};
+    const buf=await new GLTFExporter().parseAsync(m,{binary:true,maxTextureSize:2048});
+    geo.dispose(); m.material.dispose();
+    saveBlob(new Blob([buf],{type:'model/gltf-binary'}),`${S.meta.name}_3d.glb`);
+    $('ex-st').textContent=`Saved ${S.meta.name}_3d.glb (${(buf.byteLength/1e6).toFixed(1)} MB), true scale in metres.`;
+  }catch(e){ $('ex-st').textContent='3D export failed: '+e; }
+  $('ex-glb').disabled=false;
+}
+$('ex-glb').onclick=exportGLB;
+$('ex-png').onclick=async()=>{
+  if(!S)return;
+  const url=window.DW.capture(), blob=await (await fetch(url)).blob();
+  saveBlob(blob,`${S.meta.name}_view.jpg`);
+  $('ex-st').textContent=`Saved ${S.meta.name}_view.jpg.`;
+};
+
 function renderValidation(v){
   const t=$('v-table'), n=$('v-note');
   if(!v||!v.rows){t.innerHTML='';n.textContent='';return;}
-  const f=x=>x==null||isNaN(x)?'—':x.toFixed(2);
-  t.innerHTML='<tr><th></th><th>RMSE</th><th>MAE</th><th>bias</th><th>r</th></tr>'+
+  const f=x=>x==null||isNaN(x)?'-':x.toFixed(2);
+  t.innerHTML='<tr><th>alignment</th><th>RMSE</th><th>MAE</th><th>bias</th><th>r</th></tr>'+
     v.rows.map(r=>`<tr class="${/no model/.test(r.label)?'base':''}" title="${r.note}">`+
       `<td>${r.label}</td><td>${f(r.rmse_m)}</td><td>${f(r.mae_m)}</td>`+
-      `<td>${(r.bias_m>=0?'+':'')+f(r.bias_m)}</td><td>${r.r==null||isNaN(r.r)?'—':r.r.toFixed(3)}</td></tr>`).join('');
-  n.textContent=`${v.reference} · ${v.reference_type==='surface'?'surface vs our DSM':
-    'heights above ground vs our nDSM'} · covers ${(v.coverage*100).toFixed(0)}% · `+
-    'shift and affine fitted on half the area, scored on the other half';
+      `<td>${(r.bias_m>=0?'+':'')+f(r.bias_m)}</td><td>${r.r==null||isNaN(r.r)?'-':r.r.toFixed(3)}</td></tr>`).join('');
+  n.textContent=`${v.reference}: ${v.reference_type==='surface'?'surface, compared with our DSM':
+    'heights above ground, compared with our nDSM'}, covers ${(v.coverage*100).toFixed(0)}% of the run. `+
+    'Datum shift and affine are fitted on half the area and scored on the other half.';
 }
 function setBadge(){
   const m=S.meta, b=$('srcbadge');
@@ -1065,7 +1306,7 @@ function tick(){
     else { flyStep(dt); if(orbit.enabled)orbit.update(); }
     $('alt').textContent=camera.position.y.toFixed(0)+' m';
     const m=Math.round(110*(2*camera.position.y*Math.tan(camera.fov*Math.PI/360))/innerHeight);
-    $('sbtxt').textContent=m>0?`${m} m`:'—';
+    $('sbtxt').textContent=m>0?`${m} m`:'-';
     $('needle').setAttribute('transform',`rotate(${-yaw*180/Math.PI} 22 22)`);
     renderer.render(scene,camera);
     if(T.mirror)T.mirror.ctx.drawImage(renderer.domElement,0,0);
@@ -1091,6 +1332,7 @@ async function fillScenes(){
   $('scene').onchange=()=>loadScene($('scene').value);
   updateSun();
   $('legend').style.display='none';
+  document.querySelector('.legend-lab').style.display='none';
   initLive();
   const want=new URLSearchParams(location.search).get('scene');
   if(scenes.length){ await loadScene(scenes.includes(want)?want:scenes[0]);
