@@ -209,15 +209,15 @@
 
   <h2>Vertical exaggeration <span class="val" id="vexv">2.0×</span></h2>
   <input type="range" id="vex" min="0.5" max="8" step="0.1" value="2">
-  <h2>Sun azimuth <span class="val" id="sazv">135°</span></h2>
+  <h2>Sun direction <span class="val" id="sazv">135° SE</span></h2>
   <input type="range" id="saz" min="0" max="360" step="1" value="135">
   <h2>Sun elevation <span class="val" id="selv">42°</span></h2>
   <input type="range" id="sel" min="5" max="89" step="1" value="42">
 
   <h2>Navigate</h2>
   <div class="row" style="margin-top:0">
-    <button id="mode-fly" class="active">Fly</button>
-    <button id="mode-orbit">Orbit</button>
+    <button id="mode-orbit" class="active" title="Drag to rotate, scroll to zoom, click to read heights">Orbit</button>
+    <button id="mode-fly" title="First-person flight with W A S D">Fly</button>
   </div>
   <button id="measure" style="margin-top:6px">Measure distance</button>
 </div>
@@ -345,8 +345,10 @@
     <text x="22" y="5" fill="#8a9ab3" font-size="8" text-anchor="middle">N</text>
   </svg>
   <div style="font-size:11px;color:var(--dim);line-height:1.7">
-    <kbd>click</kbd> look · <kbd>W A S D</kbd> move · <kbd>Q E</kbd> altitude ·
-    <kbd>shift</kbd> fast · <kbd>esc</kbd> release
+    <span id="hint-orbit"><kbd>drag</kbd> rotate · <kbd>scroll</kbd> zoom ·
+    <kbd>right-drag</kbd> pan · <kbd>click</kbd> read height</span>
+    <span id="hint-fly" style="display:none"><kbd>click</kbd> look · <kbd>W A S D</kbd> move ·
+    <kbd>Q E</kbd> altitude · <kbd>shift</kbd> fast · <kbd>esc</kbd> release</span>
   </div>
   <div class="perf"><b id="fps">-</b> fps · <b id="verts">-</b> vertices · eye <b id="alt">-</b></div>
 </div>
@@ -370,6 +372,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
+import {sunDirection, compassNeedleDeg} from './lib/geo.js';   // tested: tests/test_sun_geo.mjs
 
 const $=id=>document.getElementById(id);
 let ASSETS=new URLSearchParams(location.search).get('assets')||'assets';
@@ -403,7 +406,7 @@ scene.add(new THREE.HemisphereLight(0xbcd8ff,0x2a3444,1.15));
 scene.add(new THREE.AmbientLight(0xffffff,0.30));
 
 const orbit=new OrbitControls(camera,renderer.domElement);
-orbit.enableDamping=true;orbit.dampingFactor=0.08;orbit.enabled=false;
+orbit.enableDamping=true;orbit.dampingFactor=0.08;orbit.enabled=true;
 
 /* ------------------------------------------------------------ app state */
 let S=null;          // {meta,heights,ref,W,H,gsd,extentX,extentY}
@@ -727,7 +730,7 @@ function frameScene(){
   const EX=S.W*S.gsd;
   camera.position.set(-EX*0.60,EX*0.46,EX*0.80);
   lookAtPoint(new THREE.Vector3(0,(S.meta.h_p99-base())*vex*0.4,0));
-  orbit.target.set(0,0,0);orbit.update();
+  orbit.update();
 }
 // point the camera AND keep fly-mode yaw/pitch consistent
 function lookAtPoint(t){
@@ -735,15 +738,17 @@ function lookAtPoint(t){
   yaw=Math.atan2(d.x,d.z);
   pitch=Math.asin(Math.max(-1,Math.min(1,d.y)));
   camera.lookAt(t);
+  orbit.target.copy(t);            // Orbit mode rotates around what we look at
 }
 
 /* ------------------------------------------------------------- sun/UI */
 function updateSun(){
-  const az=+$('saz').value*Math.PI/180, el=+$('sel').value*Math.PI/180;
-  const R=700;
-  sun.position.set(R*Math.cos(el)*Math.sin(az),R*Math.sin(el),R*Math.cos(el)*Math.cos(az));
+  // compass azimuth (0 = north = image top) and elevation above the horizon
+  const R=700, d=sunDirection(+$('saz').value, +$('sel').value);
+  sun.position.set(R*d[0],R*d[1],R*d[2]);
   sun.target.position.set(0,0,0);scene.add(sun.target);
-  $('sazv').textContent=$('saz').value+'°';$('selv').textContent=$('sel').value+'°';
+  const az=+$('saz').value, card=['N','NE','E','SE','S','SW','W','NW'][Math.round(az/45)%8];
+  $('sazv').textContent=az+'° '+card;$('selv').textContent=$('sel').value+'°';
 }
 $('saz').oninput=$('sel').oninput=updateSun;
 $('vex').oninput=e=>{vex=+e.target.value;$('vexv').textContent=vex.toFixed(1)+'×';buildMesh();};
@@ -763,7 +768,7 @@ document.querySelectorAll('[data-mode]').forEach(btn=>{
 const keys={};
 addEventListener('keydown',e=>{keys[e.code]=true;});
 addEventListener('keyup',e=>{keys[e.code]=false;});
-let yaw=2.4,pitch=-0.42,flyMode=true;
+let yaw=2.4,pitch=-0.42,flyMode=false;       // opens in Orbit mode
 
 let dragLook=false, dragPrev=null, pointerLockOK=true;
 renderer.domElement.addEventListener('click',e=>{
@@ -799,10 +804,15 @@ addEventListener('mousemove',e=>{
     pitch=Math.max(-1.5,Math.min(1.5,pitch));
   }
 });
-$('mode-fly').onclick=()=>{flyMode=true;orbit.enabled=false;
+function navHints(){ $('hint-fly').style.display=flyMode?'inline':'none';
+  $('hint-orbit').style.display=flyMode?'none':'inline'; }
+$('mode-fly').onclick=()=>{flyMode=true;orbit.enabled=false;navHints();
+  // continue from the current orbit view instead of jumping
+  const d=new THREE.Vector3(); camera.getWorldDirection(d);
+  yaw=Math.atan2(d.x,d.z); pitch=Math.asin(Math.max(-1,Math.min(1,d.y)));
   $('mode-fly').classList.add('active');$('mode-orbit').classList.remove('active');
   toast('Fly mode: click to capture the mouse, then W A S D to move');};
-$('mode-orbit').onclick=()=>{flyMode=false;orbit.enabled=true;
+$('mode-orbit').onclick=()=>{flyMode=false;orbit.enabled=true;navHints();
   document.exitPointerLock?.();
   $('mode-orbit').classList.add('active');$('mode-fly').classList.remove('active');
   toast('Orbit mode: drag to rotate, click the terrain to probe its height');};
@@ -866,7 +876,8 @@ $('measure').onclick=()=>{
   measuring=!measuring; measurePts=[];
   $('measure').classList.toggle('active',measuring);
   $('measure').textContent=measuring?'Measuring: click 2 points':'Measure distance';
-  if(!measuring&&measureLine){scene.remove(measureLine);measureLine=null;}
+  if(!measuring){ if(measureLine){scene.remove(measureLine);measureLine=null;}
+    $('profile').style.display='none'; }
   if(measuring&&flyMode)$('mode-orbit').onclick();
 };
 /* ------------------------------------------------ scene info, pipeline, export */
@@ -1275,6 +1286,7 @@ window.DW={setMode:m=>{const b=document.querySelector(`[data-mode="${m}"]`);
                         dist*Math.cos(e)*Math.cos(a));
     lookAtPoint(new THREE.Vector3(0,(S.meta.h_p99-base())*vex*0.35,0));},
   probeAt:(px,py)=>showProbe(px,py),
+  get sun(){return sun.position.toArray();},
   flood:(on,level)=>{if(level!==undefined){T.level=level;$('fl').value=level;}
     setFlood(on);return on?floodStats():null;},
   buildings:on=>{setBld(on);return S.blds?S.blds.count:null;},
@@ -1307,7 +1319,7 @@ function tick(){
     $('alt').textContent=camera.position.y.toFixed(0)+' m';
     const m=Math.round(110*(2*camera.position.y*Math.tan(camera.fov*Math.PI/360))/innerHeight);
     $('sbtxt').textContent=m>0?`${m} m`:'-';
-    $('needle').setAttribute('transform',`rotate(${-yaw*180/Math.PI} 22 22)`);
+    $('needle').setAttribute('transform',`rotate(${compassNeedleDeg(yaw)} 22 22)`);
     renderer.render(scene,camera);
     if(T.mirror)T.mirror.ctx.drawImage(renderer.domElement,0,0);
   }
@@ -1336,7 +1348,7 @@ async function fillScenes(){
   initLive();
   const want=new URLSearchParams(location.search).get('scene');
   if(scenes.length){ await loadScene(scenes.includes(want)?want:scenes[0]);
-    toast('Click the view to capture the mouse, then fly with W A S D',4200); }
+    toast('Drag to rotate, scroll to zoom, click the terrain to read its height',4200); }
   else { $('loading').textContent='No scenes here yet. Run a model with the panel on the right.';
     setTimeout(()=>{ if(!S)$('loading').style.display='none'; },2500); }
   if(want&&scenes.includes(want))$('scene').value=want;
