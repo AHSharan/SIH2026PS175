@@ -37,7 +37,7 @@
 <rect x="704" y="90" width="200" height="180" rx="9" fill="#fde5cc" stroke="#2b2b2b" stroke-width="1.2"/>
 <text x="718" y="117" font-size="16.5" font-weight="700" fill="#1c1c1c">Training photos</text>
 <text x="718" y="144" font-size="13.2" fill="#3a3a3a"><tspan font-weight="700" fill="#1c1c1c">Dataset:</tspan> GAMUS</text>
-<text x="718" y="178" font-size="13.2" fill="#3a3a3a"><tspan font-weight="700" fill="#1c1c1c">Tiles:</tspan> 1,500</text>
+<text x="718" y="178" font-size="13.2" fill="#3a3a3a"><tspan font-weight="700" fill="#1c1c1c">Train tiles:</tspan> 480</text>
 <text x="718" y="212" font-size="13.2" fill="#3a3a3a"><tspan font-weight="700" fill="#1c1c1c">Pixel size:</tspan> 0.3 m</text>
 <text x="718" y="246" font-size="13.2" fill="#3a3a3a"><tspan font-weight="700" fill="#1c1c1c">Cities:</tspan> DC, NYC, PHL</text>
 <rect x="938" y="76" width="420" height="214" rx="10" fill="none" stroke="#9a9a9a" stroke-width="1.3" stroke-dasharray="2 4"/>
@@ -101,13 +101,13 @@
 <path d="M 1100 290 L 1100 316 L 760 316 L 760 396" fill="none" stroke="#c0661a" stroke-width="2.6" stroke-dasharray="7 5" marker-end="url(#at)"/>
 <text x="1112" y="309" font-size="13.5" font-style="italic" font-weight="700" text-anchor="start" fill="#c0661a">trains the height model</text>
 <rect x="40" y="806" width="1330" height="344" rx="16" fill="none" stroke="#3a3a3a" stroke-width="2" stroke-dasharray="10 7"/>
-<text x="705.0" y="1136" text-anchor="middle" font-size="19" font-weight="700" fill="#1c1c1c">(d) Results  —  measured on 40 held-out laser-measured tiles</text>
+<text x="705.0" y="1136" text-anchor="middle" font-size="19" font-weight="700" fill="#1c1c1c">(d) Results: measured on 40 held-out laser-measured tiles</text>
 <rect x="58" y="822" width="360" height="288" rx="10" fill="none" stroke="#9a9a9a" stroke-width="1.3" stroke-dasharray="2 4"/>
-<text x="80" y="890" font-size="60" font-weight="800" fill="#2f7d4f">4.69 m</text>
-<text x="80" y="918" font-size="15" fill="#3a3a3a">average height error (best model)</text>
-<text x="80" y="962" font-size="15" fill="#3a3a3a"><tspan font-weight="700" fill="#1c1c1c">Our error:</tspan> 4.69 m</text>
+<text x="80" y="890" font-size="60" font-weight="800" fill="#2f7d4f">4.96 m</text>
+<text x="80" y="918" font-size="15" fill="#3a3a3a">average height error (RMSE)</text>
+<text x="80" y="962" font-size="15" fill="#3a3a3a"><tspan font-weight="700" fill="#1c1c1c">Our error:</tspan> 4.96 m</text>
 <text x="80" y="992" font-size="15" fill="#3a3a3a"><tspan font-weight="700" fill="#1c1c1c">RS3DAda error:</tspan> 6.74 m</text>
-<text x="80" y="1022" font-size="15" fill="#3a3a3a"><tspan font-weight="700" fill="#1c1c1c">Improvement:</tspan> 30 % lower</text>
+<text x="80" y="1022" font-size="15" fill="#3a3a3a"><tspan font-weight="700" fill="#1c1c1c">Improvement:</tspan> 26 % lower</text>
 <text x="80" y="1052" font-size="15" fill="#3a3a3a"><tspan font-weight="700" fill="#1c1c1c">Correlation:</tspan> 0.78 vs 0.60</text>
 <rect x="436" y="822" width="430" height="288" rx="10" fill="none" stroke="#9a9a9a" stroke-width="1.3" stroke-dasharray="2 4"/>
 <text x="452" y="854" font-size="16" font-weight="700" fill="#1c1c1c">Error by landscape</text>
@@ -192,5 +192,5 @@
 <text x="1290" y="745" font-size="13.5" font-style="italic" font-weight="700" text-anchor="middle" fill="#2f7d4f">saves</text>
 <path d="M 1610 806 L 1610 754" fill="none" stroke="#2f7d4f" stroke-width="3" marker-end="url(#ao)"/>
 <text x="1620" y="786" font-size="13.5" font-style="italic" font-weight="700" text-anchor="start" fill="#2f7d4f">places</text>
-<text x="40" y="1170" font-size="12" fill="#6b6b6b">All figures measured against airborne LiDAR on the same 40 held-out GAMUS test tiles. Best model 4.69 m: 1,500 training tiles. Landscape chart and correlation: 480-tile model. PNG/JPG: tests/png_jpg_accuracy.py. Imagery: Maxar Open Data (CC BY-NC 4.0). Terrain: Copernicus DEM GLO-30.</text>
+<text x="40" y="1170" font-size="12" fill="#6b6b6b">All figures measured against airborne LiDAR on the same 40 held-out GAMUS test tiles (RESULTS.md; model trained on 480 GAMUS tiles, chosen on the validation split). PNG/JPG: tests/png_jpg_accuracy.py. Imagery: Maxar Open Data (CC BY-NC 4.0). Terrain: Copernicus DEM GLO-30.</text>
 </svg>

@@ -1,4 +1,4 @@
-# DepthWizard — talking points and demo script
+# DepthWizard: talking points and demo script
 
 Every number below is **measured** on our own runs unless it says otherwise.
 
@@ -10,18 +10,23 @@ Every number below is **measured** on our own runs unless it says otherwise.
 > tree is, in metres, and builds a 3D model you can fly through. Existing depth
 > models measure distance from the camera, which doesn't work for images taken
 > from directly above. We measure height above the ground instead. On 40 test
-> areas with laser-measured ground truth, our model's error is **4.69 metres,
-> 30% lower than RS3DAda (6.74 m)**, a published remote-sensing height model we
-> ran on the same data. It runs
+> areas with laser-measured ground truth, our model's error is **4.96 metres,
+> 26% lower than RS3DAda (6.74 m)**, a published remote-sensing height model we
+> ran on the same data. We also checked the whole pipeline against airborne
+> LiDAR on hills: 3.8 m, against 5.9 m for the terrain map alone. It runs
 > on Indian imagery, and one 625 × 625 m scene takes about 13 seconds on a
 > laptop GPU."
 
 ## The one number
 
-**4.69 m average error vs 6.74 m for RS3DAda — 30 % lower**
-*(measured; RMSE against airborne LiDAR on the same 40 held-out GAMUS test tiles)*
+**4.96 m average error vs 6.74 m for RS3DAda: 26 % lower**
+*(measured; RMSE against airborne LiDAR on the same 40 held-out GAMUS test tiles,
+RESULTS.md, model trained on 480 GAMUS tiles)*
 
-If you only say one thing, say that — and say "same test tiles".
+If you only say one thing, say that, and say "same test tiles".
+
+Do **not** quote 4.69 m (the 1,500-tile run): its results file is not in the repo,
+so we cannot show where it comes from. If that file is added, it can replace 4.96.
 
 ---
 
@@ -42,7 +47,7 @@ If you only say one thing, say that — and say "same test tiles".
 3. **It works at Cartosat-like resolution.**
    "We degraded the test images from 0.3 m to 1 m pixels. Our model stayed between
    **4.60 and 5.46 m**, while the baseline stayed between 6.70 and 6.92 m
-   *(measured)* — better at every resolution we tried."
+   *(measured)*: better at every resolution we tried."
 
 4. **An Indian location, end to end.**
    "This is Chungthang in Sikkim: a WorldView-2 image in, a georeferenced
@@ -68,7 +73,7 @@ If you only say one thing, say that — and say "same test tiles".
 ## Live demo script (about 3 minutes)
 
 **Before the judges arrive, on the demo laptop:** stop any server that is already
-running (Ctrl + C in its window) — a server started before `git pull` keeps
+running (Ctrl + C in its window): a server started before `git pull` keeps
 serving the old code. Then:
 
 ```bash
@@ -89,10 +94,10 @@ window as a backup.
    Drag to orbit slowly.
 
 2. **Click "Height".**
-   Say: "Colour is elevation above sea level — the town sits on a 220 m slope."
+   Say: "Colour is elevation above sea level: the town sits on a 220 m slope."
 
 3. **Click "Measure distance", then two points across the town.**
-   Say: "The profile shows the height along this line — each bump is a building."
+   Say: "The profile shows the height along this line: each bump is a building."
 
 4. **Tools → "Buildings".**
    Say: "It finds 204 buildings and estimates their floors from height."
@@ -109,7 +114,7 @@ window as a backup.
    and score on the other half, so they can't cheat."
 
 7. **Close on the number.**
-   Say: "On laser-measured test data: 4.69 metres error, 30 % lower than RS3DAda on the same tiles."
+   Say: "On laser-measured test data: 4.96 metres error, 26 % lower than RS3DAda on the same tiles."
 
 **If anything fails live:** switch to the screenshots and say "here is the same run
 we recorded this morning". Don't debug in front of judges.
@@ -129,7 +134,7 @@ we recorded this morning". Don't debug in front of judges.
   fix the position and scale."
 
 - **"Is 6.74 m RS3DAda's own published number?"**
-  "No — we ran RS3DAda ourselves on the same 40 test tiles, so the comparison is fair.
+  "No, we ran RS3DAda ourselves on the same 40 test tiles, so the comparison is fair.
   GAMUS isn't in their paper."
 
 - **"How do you know the numbers are real?"**
@@ -148,7 +153,7 @@ we recorded this morning". Don't debug in front of judges.
 
 ---
 
-## Limitations — say these last, and only if asked
+## Limitations: say these last, and only if asked
 
 - Accuracy is measured on US aerial data (GAMUS); Indian imagery has no laser truth
   available to us, so there we show plausibility checks, not an error number.

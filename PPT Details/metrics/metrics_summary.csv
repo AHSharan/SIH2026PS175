@@ -1,0 +1,50 @@
+benchmark,method,landscape,n,rmse_m,mae_m,me_bias_m,r,within_1m,within_2_5m,within_5m,status,source
+GAMUS test (nDSM),Predict 0 m everywhere (floor),overall,40 tiles,9.35,5.1,-5.05,,0.498,0.554,0.636,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+GAMUS test (nDSM),Predict 0 m everywhere (floor),urban,24 tiles,8.81,4.74,-4.73,,0.471,0.531,0.623,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+GAMUS test (nDSM),Predict 0 m everywhere (floor),sparse,8 tiles,4.21,1.94,-1.72,,0.738,0.779,0.836,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+GAMUS test (nDSM),Predict 0 m everywhere (floor),forest,8 tiles,13.66,9.35,-9.34,,0.341,0.4,0.477,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+GAMUS test (nDSM),"RS3DAda, public weights (run by us)",overall,40 tiles,6.74,3.47,-2.27,0.597,0.486,0.657,0.799,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+GAMUS test (nDSM),"RS3DAda, public weights (run by us)",urban,24 tiles,5.11,2.68,-1.33,0.757,0.474,0.669,0.838,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+GAMUS test (nDSM),"RS3DAda, public weights (run by us)",sparse,8 tiles,2.83,1.43,-0.32,0.684,0.706,0.831,0.915,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+GAMUS test (nDSM),"RS3DAda, public weights (run by us)",forest,8 tiles,11.87,7.87,-7.07,0.306,0.301,0.445,0.567,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+GAMUS test (nDSM),Ours: DINOv3-SAT + trained head (480 train tiles),overall,40 tiles,4.96,2.44,-0.52,0.78,0.525,0.705,0.854,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+GAMUS test (nDSM),Ours: DINOv3-SAT + trained head (480 train tiles),urban,24 tiles,5.28,2.4,-0.81,0.726,0.519,0.716,0.869,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+GAMUS test (nDSM),Ours: DINOv3-SAT + trained head (480 train tiles),sparse,8 tiles,2.15,1.12,0.02,0.829,0.735,0.858,0.951,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+GAMUS test (nDSM),Ours: DINOv3-SAT + trained head (480 train tiles),forest,8 tiles,5.91,3.87,-0.2,0.807,0.329,0.518,0.715,measured,"RESULTS.md (Colab run 2026-09-26, 40 held-out GAMUS test tiles, LiDAR truth)"
+USGS 3DEP LiDAR (DSM),Ours: full DSM (Copernicus DEM + model),urban: pittsburgh_downtown,89877 px (2 m),35.948,24.748,1.5283,0.162,0.0305,0.0802,0.1547,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),No model: Copernicus DEM alone,urban: pittsburgh_downtown,89877 px (2 m),37.2031,22.7761,-10.7522,0.0921,0.0472,0.1207,0.2302,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: height above ground (nDSM),urban: pittsburgh_downtown,89877 px (2 m),37.8071,22.3377,-15.2295,0.1372,0.1132,0.2091,0.3154,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Predict 0 m everywhere (nDSM floor),urban: pittsburgh_downtown,89877 px (2 m),44.1456,27.51,-27.51,nan,0.1837,0.2784,0.3232,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: full DSM (Copernicus DEM + model),urban: pittsburgh_residential,89833 px (2 m),5.4002,4.1102,-1.0614,0.7813,0.1545,0.3971,0.7145,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),No model: Copernicus DEM alone,urban: pittsburgh_residential,89833 px (2 m),6.9516,5.4251,-3.7554,0.726,0.0993,0.2885,0.578,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: height above ground (nDSM),urban: pittsburgh_residential,89833 px (2 m),7.2378,5.1808,-4.7322,0.4794,0.2524,0.3954,0.5899,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Predict 0 m everywhere (nDSM floor),urban: pittsburgh_residential,89833 px (2 m),9.6962,7.4262,-7.4262,nan,0.2187,0.2987,0.4101,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: full DSM (Copernicus DEM + model),hilly: pittsburgh_mt_washington,89994 px (2 m),4.258,3.0086,-0.7196,0.9804,0.2388,0.5504,0.826,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),No model: Copernicus DEM alone,hilly: pittsburgh_mt_washington,89994 px (2 m),6.6167,4.9442,-3.8431,0.9679,0.1862,0.3964,0.5751,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: height above ground (nDSM),hilly: pittsburgh_mt_washington,89994 px (2 m),5.7621,3.6713,-3.1638,0.6378,0.3497,0.5252,0.738,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Predict 0 m everywhere (nDSM floor),hilly: pittsburgh_mt_washington,89994 px (2 m),8.8198,6.2873,-6.2873,nan,0.2805,0.3875,0.4893,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: full DSM (Copernicus DEM + model),hilly: park_city_ut,90000 px (2 m),3.3746,2.6888,0.2042,0.996,0.2238,0.5275,0.879,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),No model: Copernicus DEM alone,hilly: park_city_ut,90000 px (2 m),5.0416,4.0757,-3.3083,0.9949,0.1562,0.3423,0.6772,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: height above ground (nDSM),hilly: park_city_ut,90000 px (2 m),3.5531,2.6079,-1.3663,0.6686,0.306,0.5737,0.8605,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Predict 0 m everywhere (nDSM floor),hilly: park_city_ut,90000 px (2 m),6.5442,4.8788,-4.8788,nan,0.2451,0.3703,0.5901,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: full DSM (Copernicus DEM + model),forest: pennsylvania_woods,89978 px (2 m),7.9464,5.9196,-0.4095,0.9176,0.1136,0.2811,0.5259,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),No model: Copernicus DEM alone,forest: pennsylvania_woods,89978 px (2 m),8.4277,7.1142,-4.4569,0.934,0.0573,0.1558,0.3515,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: height above ground (nDSM),forest: pennsylvania_woods,89978 px (2 m),20.4885,18.7786,-18.5303,0.1936,0.0259,0.0544,0.0948,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Predict 0 m everywhere (nDSM floor),forest: pennsylvania_woods,89978 px (2 m),24.224,22.5777,-22.5777,nan,0.0281,0.0412,0.0664,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: full DSM (Copernicus DEM + model),sparse: heber_ut_farms,90000 px (2 m),1.1669,1.0983,-1.0959,0.9797,0.3301,0.9933,0.9979,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),No model: Copernicus DEM alone,sparse: heber_ut_farms,90000 px (2 m),1.3567,1.1837,-1.1834,0.9429,0.2115,0.99,0.9948,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: height above ground (nDSM),sparse: heber_ut_farms,90000 px (2 m),0.3723,0.067,-0.0276,0.8573,0.9869,0.9958,0.9987,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Predict 0 m everywhere (nDSM floor),sparse: heber_ut_farms,90000 px (2 m),0.6671,0.1151,-0.1151,nan,0.9857,0.9932,0.9955,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: full DSM (Copernicus DEM + model),sparse: butler_pa_rural,90000 px (2 m),3.5807,2.0805,-0.015,0.8442,0.4224,0.7923,0.8936,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),No model: Copernicus DEM alone,sparse: butler_pa_rural,90000 px (2 m),4.4834,2.7911,-1.9811,0.7986,0.3575,0.7281,0.8034,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: height above ground (nDSM),sparse: butler_pa_rural,90000 px (2 m),6.1132,2.8983,-2.7345,0.875,0.7139,0.7437,0.7787,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Predict 0 m everywhere (nDSM floor),sparse: butler_pa_rural,90000 px (2 m),9.5263,4.7006,-4.7006,nan,0.7132,0.7267,0.746,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: full DSM (Copernicus DEM + model),sparse: washington_pa_rural,90000 px (2 m),4.9051,3.7519,-1.2898,0.967,0.2231,0.4454,0.6981,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),No model: Copernicus DEM alone,sparse: washington_pa_rural,90000 px (2 m),7.2709,5.6792,-4.1128,0.9474,0.1747,0.3373,0.5165,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Ours: height above ground (nDSM),sparse: washington_pa_rural,90000 px (2 m),9.021,6.7094,-6.6031,0.772,0.2925,0.37,0.4679,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+USGS 3DEP LiDAR (DSM),Predict 0 m everywhere (nDSM floor),sparse: washington_pa_rural,90000 px (2 m),12.4717,9.4261,-9.4261,nan,0.2744,0.323,0.4037,measured,results/lidar_benchmark.json (tests/lidar_benchmark.py)
+GAMUS test via upload path,original data (direct),overall,40 tiles,4.96,2.44,-0.52,0.78,,,,measured,results/png_jpg_accuracy.md
+GAMUS test via upload path,PNG via upload path,overall,40 tiles,4.96,2.44,-0.52,0.78,,,,measured,results/png_jpg_accuracy.md
+GAMUS test via upload path,JPG q90 via upload path,overall,40 tiles,4.99,2.45,-0.63,0.78,,,,measured,results/png_jpg_accuracy.md
+GAMUS test via upload path,JPG q75 via upload path,overall,40 tiles,4.96,2.46,-0.56,0.782,,,,measured,results/png_jpg_accuracy.md
+GAMUS test (nDSM),"Ours: 1,500 train tiles (best_1500.pt)",overall,40 tiles,4.69,,,,,,,"reported, NOT verifiable in this repo (no results file for that run)",DSM.md / dsm.py comment

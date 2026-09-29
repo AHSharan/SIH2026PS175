@@ -7,13 +7,16 @@ Inputs
   GeoTIFF (any CRS): GSD comes from the file's transform. Outputs keep its
       CRS and grid, so they overlay the image exactly in QGIS/ArcGIS.
   PNG / JPG (no georeference): there is no DEM to add, so we write the nDSM
-      (metres above local ground) plus a 0-1 relative DSM. --gsd is required.
+      (metres above local ground) plus a 0-1 relative DSM (rDSM). Give the
+      pixel size with --gsd, or --gsd-unknown for the relative shape only, or
+      3+ --gcp points to place the image on the map (then: full DSM).
 
 Outputs (in --out)
   dsm.tif   float32, nodata -9999, LZW, same CRS/transform as the image
   ndsm.tif  model height above ground (m)
   dem.tif   Copernicus GLO-30 bilinearly resampled onto the image grid
-  report.json  provenance + sanity checks (there is NO LiDAR truth, so NO RMSE)
+  report.json  provenance + sanity checks (no reference here, so no RMSE:
+               score a run against a reference with validate.py)
   viewer assets (--export) with meta kind='dsm' and h_base for the 3D viewer
 
 Caveat, written into every output: GLO-30 is itself a 30 m SURFACE model.
@@ -507,8 +510,9 @@ DEFAULT_HEAD = os.path.join("dw_run", "ckpt", "best.pt")
 # named models for the demo: `python dsm.py --model ours`
 MODELS = {
     "rs3dada": {"backend": "rs3dada", "head": None, "label": None},
-    # our best measured model: 1,500 GAMUS training tiles, RMSE 4.69 m on the
-    # 40 held-out test tiles (vs RS3DAda 6.74 m). Copy its best.pt here as
+    # the 1,500-tile run (reported RMSE 4.69 m on the 40 held-out test tiles; its
+    # results file is not in this repo, the verified figure is the 480-tile
+    # model's 4.96 m in RESULTS.md). Copy its best.pt here as
     # dw_run/ckpt/best_1500.pt (do NOT open or unzip it).
     "ours": {"backend": "dinov3",
              "head": os.path.join("dw_run", "ckpt", "best_1500.pt"),

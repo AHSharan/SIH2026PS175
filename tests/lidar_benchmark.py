@@ -22,6 +22,8 @@ the LiDAR is the 2 m product) -> metrics:
   heights above ground : our ndsm.tif vs LiDAR height  (the model's job)
   full DSM             : our dsm.tif  vs LiDAR surface  (what the PS scores)
   terrain only         : Copernicus DEM vs LiDAR ground (error we inherit)
+  no-model baseline    : Copernicus DEM vs LiDAR surface (the DSM you get
+                         without our model: shows what the model adds)
 
 Vertical datums differ (LiDAR NAVD88, Copernicus EGM2008): any constant offset
 shows up as DSM bias and is reported, not hidden.
@@ -214,6 +216,7 @@ def run_site(cat, fn, name, land, lon, lat, work):
          "dsm": metrics(ours_dsm, l_dsm),
          "dsm_with_lidar_terrain": metrics(l_dtm + ours_ndsm, l_dsm),
          "terrain": metrics(ours_dem, l_dtm),
+         "dsm_no_model": metrics(ours_dem, l_dsm),
          "median_m": {"lidar": float(np.nanmedian(l_hag)),
                       "ours": float(np.nanmedian(ours_ndsm))}}
     np.savez_compressed(os.path.join(sdir, "grid2m.npz"), ours_ndsm=ours_ndsm, ours_dsm=ours_dsm,
@@ -277,8 +280,9 @@ def main():
          "apart. All numbers measured by `tests/lidar_benchmark.py`.", "",
          "## By landscape (pooled pixels)", "",
          "| landscape | sites | heights above ground: RMSE / MAE / bias / r | predict-zero RMSE "
-         "| full DSM: RMSE / MAE / bias / r | terrain only (Copernicus vs LiDAR): RMSE |",
-         "|---|---|---|---|---|---|"]
+         "| full DSM: RMSE / MAE / bias / r | DSM without our model (DEM alone): RMSE "
+         "| terrain only (Copernicus vs LiDAR ground): RMSE |",
+         "|---|---|---|---|---|---|---|"]
     for land in lands + ["all"]:
         ns = [r["site"] for r in good if land == "all" or r["landscape"] == land]
         if not ns:
@@ -287,8 +291,9 @@ def main():
         z = pooled(a.work, ns, "zero", "lidar_hag")
         ds = pooled(a.work, ns, "ours_dsm", "lidar_dsm")
         te = pooled(a.work, ns, "ours_dem", "lidar_dtm")
+        nm = pooled(a.work, ns, "ours_dem", "lidar_dsm")
         L.append(f"| **{land}** | {len(ns)} | {fmt(nd)} | {z['rmse_m']:.2f} | {fmt(ds)} | "
-                 f"{te['rmse_m']:.2f} |")
+                 f"{nm['rmse_m']:.2f} | {te['rmse_m']:.2f} |")
     L += ["", "## By site", "",
           "| site | landscape | LiDAR / photo year | relief (m) | median height LiDAR / ours (m) "
           "| heights: RMSE / MAE / bias / r | full DSM: RMSE / MAE / bias / r | terrain RMSE | run (s) |",

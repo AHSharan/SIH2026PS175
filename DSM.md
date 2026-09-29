@@ -43,8 +43,10 @@ If it says `CUDA out of memory`, run `python dsm.py --tile 518` instead.
 python dsm.py --model ours
 ```
 
-This runs our DINOv3-SAT head trained on 1,500 GAMUS tiles (RMSE 4.69 m on the
-40 held-out test tiles, vs 6.74 m for RS3DAda). It needs:
+This runs our DINOv3-SAT head trained on 1,500 GAMUS tiles. That run was
+reported at RMSE 4.69 m on the 40 held-out test tiles, but its results file is not
+in this repo, so the verified figure is the 480-tile model's **4.96 m** (RESULTS.md;
+RS3DAda 6.74 m on the same tiles). It needs:
 
 - `dw_run/ckpt/best_1500.pt`: the `best.pt` from the 1,500-tile run, as ONE
   file. A `.pt` is a zip inside, so never open or unzip it. `dsm.py` says

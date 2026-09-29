@@ -22,7 +22,11 @@ or "height 0 everywhere" for a heights-above-ground reference - it shows what
 the model adds.
 
 Writes validation.json, reference_on_grid.tif and residual.tif into the run
-folder. With viewer_dir it also feeds the 3D viewer (Error colouring, the
+folder, plus dsm_calibrated.tif (GeoTIFF runs): the run with the robust
+affine (offset + scale of the model heights) fitted on ALL reference pixels
+applied, i.e. the scale-calibration step for users who have reference
+heights. Whether calibration helps is what the held-out "Robust affine" row
+shows; the fitted s and t are stored in validation.json. With viewer_dir it also feeds the 3D viewer (Error colouring, the
 Reference button and the validation table).
 """
 from __future__ import annotations
@@ -178,7 +182,25 @@ def validate(run_dir, ref_path, viewer_dir=None, scene=None, ref_name=None):
 
     surf_ref = ref if ref_type == "surface" or kind != "dsm" else dem + ref
     run_surf = dem + obj if kind == "dsm" else obj
+    # calibrated product: affine fitted on every reference pixel (the table rows
+    # above were fitted on half and scored on the other half)
+    k = np.flatnonzero(valid.ravel())
+    if k.size > MAX_FIT_SAMPLES:
+        k = np.random.default_rng(0).choice(k, MAX_FIT_SAMPLES, replace=False)
+    r_, c_ = np.unravel_index(k, valid.shape)
+    _, cal = C.fit_affine(obj, (r_, c_, ref[r_, c_] - base[r_, c_]),
+                          s_clip=(0.6, 1.6) if rep.get("scale_known", True) is not False else (1e-3, 1e3))
+    if cal.get("applied"):
+        res["calibration"] = {"scale": cal["s"], "offset_m": cal["t"], "n_samples": cal["n_samples"],
+                              "applies_to": "model heights (nDSM); terrain unchanged" if ref_type ==
+                              "surface" else "model heights (nDSM)"}
     if crs is not None:
+        if cal.get("applied"):
+            M.write_tif(os.path.join(run_dir, "dsm_calibrated.tif"),
+                        (dem if kind == "dsm" else 0) + cal["s"] * obj + cal["t"], crs, tr,
+                        {"PRODUCT": "DSM after robust affine calibration to the reference (m)",
+                         "CALIBRATION": f"height = {cal['s']:.4f} x model + {cal['t']:.3f} m",
+                         "REFERENCE": res["reference"]})
         tags = {"PRODUCT": f"reference {res['reference']} on this grid"}
         M.write_tif(os.path.join(run_dir, "reference_on_grid.tif"), surf_ref, crs, tr, tags)
         M.write_tif(os.path.join(run_dir, "residual.tif"), run_surf - surf_ref, crs, tr,

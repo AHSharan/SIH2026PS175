@@ -41,6 +41,8 @@ IMAGE_EXT = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
 DOWNLOADS = [("dsm.tif", "DSM GeoTIFF", "elevation above sea level (m)"),
              ("ndsm.tif", "Heights GeoTIFF", "height above ground (m)"),
              ("dem.tif", "Terrain GeoTIFF", "the DEM on this grid (m)"),
+             ("dsm_calibrated.tif", "Calibrated DSM GeoTIFF",
+              "DSM after offset + scale fitted to the reference"),
              ("residual.tif", "Error GeoTIFF", "run minus reference (m)"),
              ("reference_on_grid.tif", "Reference GeoTIFF", "reference on this grid (m)"),
              ("rdsm_0to1.png", "Relative shape PNG", "0-1 scaled heights"),

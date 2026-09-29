@@ -168,7 +168,7 @@ def main():
               [("Source", "WorldView-2"), ("Place", "Chungthang, Sikkim"),
                ("Pixel size", "0.31 m"), ("Formats", "GeoTIFF, PNG, JPG")], C_IN, n=1)
     data_card(498, 76, t["gamus_rgb"], "Training photos",
-              [("Dataset", "GAMUS"), ("Tiles", "1,500"), ("Pixel size", "0.3 m"),
+              [("Dataset", "GAMUS"), ("Train tiles", "480"), ("Pixel size", "0.3 m"),
                ("Cities", "DC, NYC, PHL")], C_TR)
     data_card(938, 76, t["gamus_lidar"], "Laser heights",
               [("Source", "airborne LiDAR"), ("Measures", "true heights"),
@@ -209,12 +209,12 @@ def main():
           label="trains the height model", lx=1112, ly=309)
 
     # ---------------------------------------------------------------- (d)
-    panel(40, 806, 1330, 344, "(d) Results  —  measured on 40 held-out laser-measured tiles")
+    panel(40, 806, 1330, 344, "(d) Results: measured on 40 held-out laser-measured tiles")
     card(58, 822, 360, 288)
-    add(f'<text x="80" y="890" font-size="60" font-weight="800" fill="{A_OUT}">4.69 m</text>')
-    add(f'<text x="80" y="918" font-size="15" fill="{DIM}">average height error (best model)</text>')
-    kv(80, 962, [("Our error", "4.69 m"), ("RS3DAda error", "6.74 m"),
-                 ("Improvement", "30 % lower"), ("Correlation", "0.78 vs 0.60")], fs=15, lead=30)
+    add(f'<text x="80" y="890" font-size="60" font-weight="800" fill="{A_OUT}">4.96 m</text>')
+    add(f'<text x="80" y="918" font-size="15" fill="{DIM}">average height error (RMSE)</text>')
+    kv(80, 962, [("Our error", "4.96 m"), ("RS3DAda error", "6.74 m"),
+                 ("Improvement", "26 % lower"), ("Correlation", "0.78 vs 0.60")], fs=15, lead=30)
     card(436, 822, 430, 288)
     chart(452, 836, 400, 262)
     card(884, 822, 470, 288)
@@ -259,8 +259,8 @@ def main():
     arrow([(1610, 806), (1610, 754)], A_OUT, width=3, label="places", lx=1620, ly=786)
 
     add(f'<text x="40" y="{H - 10}" font-size="12" fill="{MUTE}">All figures measured against '
-        'airborne LiDAR on the same 40 held-out GAMUS test tiles. Best model 4.69 m: 1,500 training '
-        'tiles. Landscape chart and correlation: 480-tile model. PNG/JPG: tests/png_jpg_accuracy.py. '
+        'airborne LiDAR on the same 40 held-out GAMUS test tiles (RESULTS.md; model trained on 480 '
+        'GAMUS tiles, chosen on the validation split). PNG/JPG: tests/png_jpg_accuracy.py. '
         'Imagery: Maxar Open Data (CC BY-NC 4.0). Terrain: Copernicus DEM GLO-30.</text>')
     add("</svg>")
     with open(OUT, "w", encoding="utf-8") as f:

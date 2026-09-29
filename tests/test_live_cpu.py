@@ -39,6 +39,22 @@ def http(method, url, data=None):
         return e.code, json.loads(e.read())
 
 
+def _remove_scene(sc):
+    """The demo-model job writes a FAKE-height scene into the real viewer folder;
+    remove it again so it can never be shown to anyone as a result."""
+    if not sc:
+        return
+    live = os.path.join(ROOT, "web", "assets_live")
+    for f in os.listdir(live):
+        if f.startswith(sc + "_"):
+            os.remove(os.path.join(live, f))
+    sp = os.path.join(live, "scenes.json")
+    if os.path.exists(sp):
+        scenes = [x for x in json.load(open(sp)) if x != sc]
+        json.dump(scenes, open(sp, "w"))
+    shutil.rmtree(os.path.join(ROOT, "out_dsm", sc), ignore_errors=True)
+
+
 def main():
     # ---- checkpoint type detection (what torch.load returns, as plain dicts)
     check("our head checkpoint -> dinov3_head",
@@ -118,6 +134,7 @@ def main():
         finally:
             srv.terminate()
             srv.wait(5)
+            _remove_scene(locals().get("sc"))
         # plain serve.py (no --live) keeps the API off
         srv = subprocess.Popen([sys.executable, "serve.py", "--port", str(port + 1)], cwd=ROOT,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

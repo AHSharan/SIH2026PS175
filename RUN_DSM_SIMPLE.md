@@ -101,8 +101,8 @@ old result, copy the zip somewhere else first.
 
 ## Part C2 — Run OUR model (use this for the demo)
 
-Our own model is more accurate than the default one (4.69 m vs 6.74 m error on
-the US test tiles), especially on trees. It needs two extra things, once:
+Our own model is more accurate than the default one (4.96 m vs 6.74 m error on
+the 40 US test tiles for the 480-tile model, RESULTS.md), especially on trees. It needs two extra things, once:
 
 **1. The model file.** Get `best.pt` from the 1,500-tile training run
 (Google Drive: `depthwizard_1500/ckpt/best.pt`).
