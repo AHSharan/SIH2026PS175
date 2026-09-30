@@ -645,7 +645,10 @@ ${walls?'varying float vWall;\nvarying float vWorldY;\nuniform float uHMax;\nuni
     if(walls){
       sh.uniforms.uHMax={value:(!S?40.0:(S.hag?(S.meta.ndsm_p99||10)*vex
                                               :(S.meta.h_p99-base())*vex))};
-      sh.uniforms.uTint={value:(S&&S.meta.source==='prediction'&&surf!=='ref')?1.0:0.0};
+      // photo-coloured walls for every scene we produced, including its reference
+      // surface: a LiDAR reference is full of steep tree and roof edges, and flat
+      // grey there turned about a quarter of the scene grey
+      sh.uniforms.uTint={value:(S&&S.meta.source==='prediction')?1.0:0.0};
     }
     mat.userData.sh=sh;
   };
