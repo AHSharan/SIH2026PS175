@@ -95,7 +95,9 @@ def _row(label, note, pred, ref, m, extra=None):
         return None
     r = E.metrics_from(pred[k] - ref[k], ref[k])
     out = {"label": label, "note": note, "rmse_m": r["rmse_m"], "mae_m": r["mae_m"],
-           "bias_m": r["bias_m"], "r": r["pearson_r"], "n_px": r["n_px"],
+           "bias_m": r["bias_m"],
+           # NaN (e.g. a constant 'height 0' baseline) is not valid JSON for the browser
+           "r": r["pearson_r"] if np.isfinite(r["pearson_r"]) else None, "n_px": r["n_px"],
            "acc_lt_1m": r["acc_lt_1.0m"] if "acc_lt_1.0m" in r else None}
     out.update(extra or {})
     return out
