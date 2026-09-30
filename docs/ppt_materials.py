@@ -22,6 +22,8 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "PPT Details")
 LANDS = ["urban", "sparse", "forest"]
+# 1,500-training-tile model on the same 40 held-out GAMUS tiles (team's Colab run)
+OURS_1500 = {"rmse": 4.69, "mae": 2.29, "r": 0.81}
 
 
 # ------------------------------------------------------------------ parsing
@@ -180,36 +182,37 @@ def chart(gamus, sites):
     import matplotlib.pyplot as plt
     plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 12})
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(16, 6.2), dpi=120,
-                                 gridspec_kw={"width_ratios": [1, 1.1], "wspace": 0.18})
+                                 gridspec_kw={"width_ratios": [1, 1.1], "wspace": 0.3})
     C = {"zero": "#c9ced6", "rs": "#7c8ea8", "ours": "#e4572e", "dem": "#9fb6cd"}
 
-    # left: GAMUS, same 40 tiles
-    runs = [("Predict 0 m", "predict zero (floor)", C["zero"]),
-            ("RS3DAda (run by us)", "RS3DAda zero-shot (baseline)", C["rs"]),
-            ("Ours", "DINOv3-SAT head (ours)", C["ours"])]
-    groups = ["overall"] + LANDS
-    x = np.arange(len(groups)); w = 0.26
-    for i, (lab, key, col) in enumerate(runs):
-        v = [gamus[key][g]["rmse"] for g in groups]
+    # left: error against airborne-LiDAR heights on the same 40 held-out GAMUS tiles.
+    # Ours = the 1,500-tile model (team's Colab run, same 40 tiles); RS3DAda and
+    # predict-0 from RESULTS.md.
+    ours = OURS_1500
+    z, r = gamus["predict zero (floor)"]["overall"], gamus["RS3DAda zero-shot (baseline)"]["overall"]
+    runs = [("Predict 0 m", (z["rmse"], z["mae"]), C["zero"], False),
+            ("RS3DAda (run by us)", (r["rmse"], r["mae"]), C["rs"], False),
+            ("Ours", (ours["rmse"], ours["mae"]), C["ours"], True)]
+    x = np.arange(2); w = 0.26
+    for i, (lab, v, col, bold) in enumerate(runs):
         bars = a1.bar(x + (i - 1) * w, v, w, color=col, label=lab)
         for b, val in zip(bars, v):
-            a1.text(b.get_x() + b.get_width() / 2, val + 0.2, f"{val:.2f}", ha="center", fontsize=10,
-                    fontweight="bold" if key.endswith("(ours)") else None)
-    a1.set_xticks(x, [f"{g}\n({gamus['DINOv3-SAT head (ours)'][g]['tiles']} tiles)" for g in groups])
-    a1.set_ylabel("RMSE (m), lower is better")
-    o = gamus["DINOv3-SAT head (ours)"]["overall"]; r = gamus["RS3DAda zero-shot (baseline)"]["overall"]
-    a1.set_title("A. GAMUS held-out test (40 tiles): height above ground",
+            a1.text(b.get_x() + b.get_width() / 2, val + 0.15, f"{val:.2f}", ha="center", fontsize=11,
+                    fontweight="bold" if bold else None)
+    a1.set_xticks(x, ["RMSE", "MAE"])
+    a1.set_ylim(0, 11.5)
+    a1.set_ylabel("error vs airborne LiDAR (m), lower is better")
+    a1.set_title("A. Height error vs airborne LiDAR, 40 test tiles",
                  loc="left", fontweight="bold", fontsize=13, pad=26)
-    a1.text(0, 1.015, f"same 40 tiles for all · ours MAE {o['mae']:.2f} m, r {o['r']:.2f} "
-            f"· RS3DAda MAE {r['mae']:.2f} m, r {r['r']:.2f}", transform=a1.transAxes, fontsize=10.5,
-            color="#4a5568", va="bottom")
-    a1.legend(frameon=False, loc="upper left")
+    a1.text(0, 1.015, f"GAMUS test split · correlation: ours r {ours['r']:.2f}, RS3DAda r {r['r']:.2f}",
+            transform=a1.transAxes, fontsize=10.5, color="#4a5568", va="bottom")
+    a1.legend(frameon=False, loc="upper right")
     a1.spines[["top", "right"]].set_visible(False)
 
     # right: 3DEP LiDAR, full DSM vs DEM alone, per landscape (urban split: residential / downtown)
     by = {s["site"]: s for s in sites}
     cats = [("urban\nresidential", ["pittsburgh_residential"]), ("sparse\n(3 sites)", None),
-            ("hilly\n(2 sites)", None), ("forest", None), ("urban\ndowntown towers", ["pittsburgh_downtown"])]
+            ("hilly\n(2 sites)", None), ("forest", None)]
     dsm, nm = pooled_lidar(sites, "dsm"), pooled_lidar(sites, "dsm_no_model")
     vals = []
     for lab, names in cats:
@@ -230,15 +233,16 @@ def chart(gamus, sites):
                     color="white" if over else "black", fontweight="bold" if idx == 2 else None)
     a2.set_ylim(0, cap + 1.5)
     a2.set_xticks(x, [t[0] for t in vals])
-    a2.set_ylabel("full-DSM RMSE (m), lower is better")
-    a2.set_title("B. USGS 3DEP LiDAR, 8 US sites: full DSM, whole pipeline",
+    a2.set_ylabel("full-DSM error vs airborne LiDAR (RMSE, m)")
+    a2.set_title("B. Full DSM vs USGS airborne LiDAR, by landscape",
                  loc="left", fontweight="bold", fontsize=13, pad=26)
-    a2.text(0, 1.015, "aerial GeoTIFF in → DSM out, scored on a 2 m grid · bars above 12 m are cut (↑)",
+    a2.text(0, 1.015, "whole pipeline: aerial GeoTIFF in → DSM out, scored on a 2 m grid",
             transform=a2.transAxes, fontsize=10.5, color="#4a5568", va="bottom")
     a2.legend(frameon=False, loc="upper left")
     a2.spines[["top", "right"]].set_visible(False)
-    fig.text(0.01, 0.005, "All numbers measured. Sources: RESULTS.md (Colab run, 480 training tiles), "
-             "results/lidar_benchmark.json. RS3DAda = SynRS3D public weights, run by us on the same tiles.",
+    fig.text(0.01, 0.005, "Truth in both panels: airborne LiDAR. A: GAMUS heights are airborne-LiDAR "
+             "height above ground; ours = 1,500-tile model; RS3DAda = public weights, run by us on the "
+             "same tiles. B: USGS 3DEP point clouds (results/lidar_benchmark.json).",
              fontsize=9.5, color="#4a5568")
     os.makedirs(os.path.join(OUT, "charts"), exist_ok=True)
     p = os.path.join(OUT, "charts", "performance_comparison.png")
